@@ -28,7 +28,6 @@ export default function Header({session}) {
 
         <div className="flex items-center space-x-4">
           <span className="text-gray-600">AI Assistant</span>
-          {session.user.name}
          <SettingsDropdown session={session}/>
         </div>
       </div>
