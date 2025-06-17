@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import { Projects } from '@/data/projects';
 import { Units } from '@/data/units';
-import ProjectCard from '@/components/projects/ProjectCard';
+import  ProjectCard  from '@/components/projects/projectCard';
 import Header from '@/components/layout/header';
 import { useSession } from 'next-auth/react';
 import { Search, Filter, MapPin, Building, TrendingUp } from 'lucide-react';
