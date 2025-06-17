@@ -603,8 +603,6 @@ function AnalyticsContent() {
 
 export default function AnalyticsPage() {
   return (
-    <DashboardLayout>
       <AnalyticsContent />
-    </DashboardLayout>
   );
 }
