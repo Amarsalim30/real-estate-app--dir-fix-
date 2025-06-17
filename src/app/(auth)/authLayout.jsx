@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function AuthLayout({ children = <DemoAuthForm /> }) {
+export default function AuthLayout({ children }) {
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4">
       {/* Background with gradient overlay */}

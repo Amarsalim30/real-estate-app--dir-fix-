@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import transactions from '@/app/payments/data'; // Adjust the import path as necessary
 import { Search, Filter, Download, Eye, Calendar, DollarSign, Home, User, FileText, ChevronDown, ChevronUp } from 'lucide-react';
-import Sidebar from '@/components/layout/sidebarLayout'; // Adjust the import path as necessary
+import Sidebar from '@/components/layout/sidebar'; // Adjust the import path as necessary
 const RealEstateTransactions = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');

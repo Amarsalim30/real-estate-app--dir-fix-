@@ -1,0 +1,124 @@
+src/
+├── app/
+│   ├── layout.js
+│   ├── page.js
+│   ├── globals.css
+│   ├── providers.js
+│   ├── projects/
+│   │   ├── page.js                    // List all projects
+│   │   └── [projectId]/
+│   │       ├── page.js                // Project detail with units
+│   │       └── units/
+│   │           └── [unitId]/
+│   │               ├── page.js        // Unit detail
+│   │               ├── reserve/
+│   │               │   └── page.js    // Reserve unit
+│   │               └── purchase/
+│   │                   └── page.js    // Purchase unit
+│   ├── units/
+│   │   ├── page.js                    // All units listing
+│   │   └── [unitId]/
+│   │       └── page.js                // Unit detail (alternative route)
+│   ├── buyers/
+│   │   ├── page.js                    // Buyers list (admin)
+│   │   └── [buyerId]/
+│   │       ├── page.js                // Buyer profile
+│   │       ├── statement/
+│   │       │   └── page.js            // Buyer statement
+│   │       └── invoices/
+│   │           └── page.js            // Buyer invoices
+│   ├── invoices/
+│   │   ├── page.js                    // All invoices
+│   │   └── [invoiceId]/
+│   │       └── page.js                // Invoice detail
+│   ├── payments/
+│   │   ├── page.js                    // Payment history
+│   │   └── [paymentId]/
+│   │       └── page.js                // Payment detail
+│   ├── dashboard/
+│   │   ├── page.js                    // User dashboard
+│   │   └── admin/
+│   │       ├── page.js                // Admin dashboard
+│   │       ├── projects/
+│   │       │   └── page.js            // Manage projects
+│   │       ├── units/
+│   │       │   └── page.js            // Manage units
+│   │       ├── buyers/
+│   │       │   └── page.js            // Manage buyers
+│   │       ├── invoices/
+│   │       │   └── page.js            // Manage invoices
+│   │       └── payments/
+│   │           └── page.js            // Manage payments
+│   └── api/
+│       ├── auth/
+│       │   └── [...nextauth]/
+│       │       └── route.js
+│       ├── projects/
+│       │   └── route.js
+│       ├── units/
+│       │   └── route.js
+│       ├── buyers/
+│       │   └── route.js
+│       ├── invoices/
+│       │   └── route.js
+│       └── payments/
+│           └── route.js
+├── components/
+│   ├── layout/
+│   │   ├── header.jsx
+│   │   ├── sidebar.jsx
+│   │   └── footer.jsx
+│   ├── projects/
+│   │   ├── ProjectCard.jsx
+│   │   ├── ProjectDetail.jsx
+│   │   ├── ProjectList.jsx
+│   │   └── ProjectStats.jsx
+│   ├── units/
+│   │   ├── UnitCard.jsx
+│   │   ├── UnitDetail.jsx
+│   │   ├── UnitList.jsx
+│   │   ├── UnitStatusBadge.jsx
+│   │   └── UnitFilters.jsx
+│   ├── buyers/
+│   │   ├── BuyerCard.jsx
+│   │   ├── BuyerDetail.jsx
+│   │   ├── BuyerList.jsx
+│   │   └── BuyerForm.jsx
+│   ├── invoices/
+│   │   ├── InvoiceCard.jsx
+│   │   ├── InvoiceDetail.jsx
+│   │   ├── InvoiceList.jsx
+│   │   └── InvoiceGenerator.jsx
+│   ├── payments/
+│   │   ├── PaymentCard.jsx
+│   │   ├── PaymentDetail.jsx
+│   │   ├── PaymentList.jsx
+│   │   ├── PaymentForm.jsx
+│   │   └── PaymentHistory.jsx
+│   ├── statements/
+│   │   ├── BuyerStatement.jsx
+│   │   └── StatementGenerator.jsx
+│   ├── forms/
+│   │   ├── ReservationForm.jsx
+│   │   ├── PurchaseForm.jsx
+│   │   └── PaymentForm.jsx
+│   └── ui/
+│       ├── Button.jsx
+│       ├── Card.jsx
+│       ├── Modal.jsx
+│       ├── Table.jsx
+│       └── StatusBadge.jsx
+├── data/
+│   ├── projects.js
+│   ├── units.js
+│   ├── buyers.js
+│   ├── invoices.js
+│   └── payments.js
+├── lib/
+│   ├── auth.js
+│   ├── utils.js
+│   └── roles.js
+└── utils/
+    ├── formatPrice.js
+    ├── dateUtils.js
+    └── calculations.js
