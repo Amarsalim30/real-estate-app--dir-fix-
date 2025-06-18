@@ -1125,8 +1125,6 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <DashboardLayout>
       <AnalyticsContent />
-    </DashboardLayout>
   );
 }

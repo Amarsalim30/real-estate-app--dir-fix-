@@ -2,14 +2,17 @@
 import { useState } from "react";
 import { Bell, Search, Settings } from "lucide-react";
 import SettingsDropdown from "../ui/SettingsDropdown";
+import { useSession } from "next-auth/react";
 
-export default function Header({session}) {
+export default function Header({}) {
   const [searchTerm, setSearchTerm] = useState('');
+  const { data: session, status } = useSession();
+
 
   return (
     // {/* Header */}
     <div className="bg-white shadow-sm border-b">
-      <div className="flex items-center justify-between px-8 py-4">
+      <div className="flex items-center justify-between px-8 py-3.5">
         <div className="flex items-center space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
