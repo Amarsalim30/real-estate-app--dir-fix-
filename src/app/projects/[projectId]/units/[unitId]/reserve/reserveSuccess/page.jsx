@@ -3,7 +3,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { Projects } from '@/data/projects';
 import { Units } from '@/data/units';
 import { useSession } from 'next-auth/react';
-import Header from '@/components/layout/header';
 import { formatPrice } from '@/utils/format';
 import { 
   CheckCircle, 
@@ -47,7 +46,6 @@ export default function ReservationSuccessPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header session={session} />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Success Header */}

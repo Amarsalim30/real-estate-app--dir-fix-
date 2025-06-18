@@ -3,8 +3,7 @@ import { useState, useMemo } from 'react';
 import { Projects } from '@/data/projects';
 import { Units } from '@/data/units';
 import  ProjectCard  from '@/components/projects/projectCard';
-import Header from '@/components/layout/header';
-import { Navbar } from '@/components/layout/navbar';
+
 import { 
   Search, 
   Filter, 
@@ -231,7 +230,6 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -263,7 +261,7 @@ export default function ProjectsPage() {
             <div className="flex items-center space-x-4">
               {/* Sort */}
               <select
-                value={`${sortBy}-${sortOrder}`}
+                  value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [sort, order] = e.target.value.split('-');
                   setSortBy(sort);

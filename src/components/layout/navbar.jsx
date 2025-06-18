@@ -16,7 +16,7 @@ import { usePathname } from "next/navigation";
 export const navLinks = [
   { name: 'Home', href: '/', icon: Home, type: 'route' },
   { name: 'About', href: 'story', icon: Info, type: 'scroll' },
-  { name: 'Properties', href: '/public-property-listing', icon: Search, type: 'route' },
+  { name: 'Properties', href: '/projects', icon: Search, type: 'route' },
   { name: 'Services', href: 'services', icon: Building, type: 'scroll' },
   { name: 'Contact', href: 'contact', icon: MessageSquare, type: 'scroll' },
 ];

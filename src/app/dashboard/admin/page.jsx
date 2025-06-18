@@ -10,6 +10,7 @@ import { Invoices } from "@/data/invoices";
 import { Payments } from "@/data/payments";
 import { cn } from "@/lib/utils";
 import DashboardLayout from "@/components/layout/dashboard-layout";
+import Header from "@/components/layout/header";
 
 const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = "primary" }) => {
     const colorClasses = {

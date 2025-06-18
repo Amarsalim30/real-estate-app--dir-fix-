@@ -3,7 +3,6 @@ import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Projects } from '@/data/projects';
 import { Units } from '@/data/units';
-import { Navbar } from '@/components/layout/navbar';
 import { formatPrice } from '@/utils/format';
 import {
   ArrowLeft,
@@ -265,8 +264,6 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
-
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
