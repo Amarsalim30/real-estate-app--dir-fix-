@@ -8,7 +8,7 @@ import { Units } from '@/data/units';
 import { Projects } from '@/data/projects';
 import { useSession } from 'next-auth/react';
 import Header from '@/components/layout/header';
-import { formatPrice } from '@/utils/formatPrice';
+import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 
 export default function BuyerStatementPage() {
@@ -317,7 +317,8 @@ export default function BuyerStatementPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Charges:</span>
-                  <span className="font-medium text-red-600">+{formatPrice(totals.totalInvoiced)}</span>
+                  <span className="font-medium text-red-600">+
+{formatPrice(totals.totalInvoiced)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Payments:</span>

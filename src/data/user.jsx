@@ -1,6 +1,7 @@
 export const users = [
   {
     id: 1,
+    buyerId: 1,
     username: "admin",
     email: "admin@realestate.com",
     password: "admin123", // In production, use hashed passwords
@@ -12,6 +13,7 @@ export const users = [
   },
   {
     id: 2,
+    buyerId: 2,
     username: "johndoe",
     email: "john@example.com",
     password: "user123", // In production, use hashed passwords
@@ -23,8 +25,9 @@ export const users = [
   },
   {
     id: 3,
+    buyerId: 3,
     username: "janedoe",
-    email: "jane@example.com",
+    email: "michael.brown@email.com",
     password: "user123", // In production, use hashed passwords
     role: "user",
     firstName: "Jane",

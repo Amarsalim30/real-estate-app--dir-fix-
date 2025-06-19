@@ -126,9 +126,23 @@ function PaymentDetailContent() {
   const [unit, setUnit] = useState(null);
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
   const isCashier = session?.user?.role === ROLES.CASHIER || isAdmin;
+
+  // Get user's buyer ID
+  const getUserBuyerId = () => {
+    if (session?.user?.buyerId) {
+      return session.user.buyerId;
+    }
+    
+    // Fallback: find buyer by email if buyerId not in session
+    const buyer = Buyers.find(b => b.email === session?.user?.email);
+    return buyer?.id || null;
+  };
+
+  const userBuyerId = getUserBuyerId();
 
   useEffect(() => {
     const fetchPaymentData = () => {
@@ -136,6 +150,13 @@ function PaymentDetailContent() {
         const foundPayment = Payments?.find(p => p.id === paymentId);
         
         if (!foundPayment) {
+          setLoading(false);
+          return;
+        }
+
+        // Check if non-admin user can access this payment
+        if (!isAdmin && foundPayment.buyerId !== userBuyerId) {
+          setAccessDenied(true);
           setLoading(false);
           return;
         }
@@ -167,7 +188,7 @@ function PaymentDetailContent() {
     };
 
     fetchPaymentData();
-  }, [paymentId]);
+  }, [paymentId, isAdmin, userBuyerId]);
 
   const handleEdit = () => {
     router.push(`/payments/${paymentId}/edit`);
@@ -205,6 +226,25 @@ function PaymentDetailContent() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+          <p className="text-gray-600 mb-4">You don't have permission to view this payment.</p>
+          <Link
+            href="/payments"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Payments
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (!payment) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -236,7 +276,9 @@ function PaymentDetailContent() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Payment Details</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {isAdmin ? 'Payment Details' : 'Your Payment Details'}
+            </h1>
             <p className="text-gray-600">Payment #{payment.paymentNumber}</p>
           </div>
         </div>
@@ -365,7 +407,7 @@ function PaymentDetailContent() {
                 </Link>
               )}
 
-              {buyer && (
+              {buyer && isAdmin && (
                 <Link
                   href={`/buyers/${buyer.id}`}
                   className="flex items-center w-full px-4 py-3 text-left bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
@@ -406,10 +448,10 @@ function PaymentDetailContent() {
         </div>
       </div>
 
-      {/* Buyer Information */}
-      {buyer && (
+      {/* Buyer Information - Show for admin or if it's the user's own payment */}
+      {buyer && (isAdmin || payment.buyerId === userBuyerId) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <InfoCard title="Buyer Information">
+          <InfoCard title={isAdmin ? "Buyer Information" : "Your Information"}>
             <div className="space-y-4">
               <div className="flex items-center space-x-3">
                 <User className="w-5 h-5 text-gray-400" />
@@ -635,9 +677,9 @@ function PaymentDetailContent() {
         </InfoCard>
       </div>
 
-      {/* Related Payments */}
-      {buyer && (
-        <InfoCard title="Related Payments" className="mb-8">
+      {/* Related Payments - Only show for admin or user's own payments */}
+      {buyer && (isAdmin || payment.buyerId === userBuyerId) && (
+        <InfoCard title={isAdmin ? "Related Payments" : "Your Other Payments"} className="mb-8">
           <div className="overflow-x-auto">
             <table className="min-w-full">
               <thead>
@@ -685,14 +727,16 @@ function PaymentDetailContent() {
             
             {Payments?.filter(p => p.buyerId === buyer.id && p.id !== payment.id).length === 0 && (
               <div className="text-center py-8">
-                <p className="text-gray-500">No other payments found for this buyer.</p>
+                <p className="text-gray-500">
+                  {isAdmin ? 'No other payments found for this buyer.' : 'No other payments found.'}
+                </p>
               </div>
             )}
           </div>
         </InfoCard>
       )}
 
-      {/* Admin Actions */}
+      {/* Admin Actions - Only for Admin */}
       {isAdmin && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-red-900 mb-4">Admin Actions</h3>
@@ -728,12 +772,46 @@ function PaymentDetailContent() {
           </p>
         </div>
       )}
+
+      {/* User Help Section - Only for non-admin users */}
+      {!isAdmin && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-4">Need Help?</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-start space-x-3">
+              <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-900">Call Support</p>
+                <p className="text-sm text-blue-700">1-800-SUPPORT</p>
+                <p className="text-xs text-blue-600">Mon-Fri 9AM-6PM EST</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3">
+              <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-900">Email Support</p>
+                <p className="text-sm text-blue-700">support@company.com</p>
+                <p className="text-xs text-blue-600">Response within 24 hours</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-blue-200">
+            <p className="text-sm text-blue-700">
+              <strong>Payment Issues:</strong> If you have questions about this payment or need to request a refund, 
+              please contact our support team with your payment number: <strong>{payment.paymentNumber}</strong>
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 export default function PaymentDetailPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
 
   if (status === 'loading') {
     return (
@@ -746,21 +824,15 @@ export default function PaymentDetailPage() {
   }
 
   if (!session) {
-    return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
-            <p className="text-gray-600">Please sign in to view payment details.</p>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
+    router.push('/login');
+    return null;
   }
 
+  // Allow access for admin, cashier, manager, or regular users (they'll see filtered content)
   const canViewPayments = session.user.role === ROLES.ADMIN || 
                          session.user.role === ROLES.CASHIER || 
-                         session.user.role === ROLES.MANAGER;
+                         session.user.role === ROLES.MANAGER ||
+                         session.user.role === ROLES.USER;
 
   if (!canViewPayments) {
     return (

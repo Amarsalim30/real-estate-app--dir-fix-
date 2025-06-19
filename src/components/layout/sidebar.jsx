@@ -68,27 +68,27 @@ const sidebarItems = [
     description: 'Payment history'
   },
   // Admin-only management sections
-  { 
-    icon: BarChart3, 
-    label: 'Admin Dashboard', 
-    pathname: '/dashboard/admin', 
-    roles: ['admin'],
-    description: 'Administrative overview'
-  },
-  { 
-    icon: Building, 
-    label: 'Manage Projects', 
-    pathname: '/dashboard/admin/projects', 
-    roles: ['admin'],
-    description: 'Project management'
-  },
-  { 
-    icon: Home, 
-    label: 'Manage Units', 
-    pathname: '/dashboard/admin/units', 
-    roles: ['admin'],
-    description: 'Unit management'
-  },
+  // { 
+  //   icon: BarChart3, 
+  //   label: 'Admin Dashboard', 
+  //   pathname: '/dashboard/admin', 
+  //   roles: ['admin'],
+  //   description: 'Administrative overview'
+  // },
+  // { 
+  //   icon: Building, 
+  //   label: 'Manage Projects', 
+  //   pathname: '/dashboard/admin/projects', 
+  //   roles: ['admin'],
+  //   description: 'Project management'
+  // },
+  // { 
+  //   icon: Home, 
+  //   label: 'Manage Units', 
+  //   pathname: '/dashboard/admin/units', 
+  //   roles: ['admin'],
+  //   description: 'Unit management'
+  // },
   { 
     icon: Users, 
     label: 'Manage Buyers', 
@@ -96,13 +96,7 @@ const sidebarItems = [
     roles: ['admin'],
     description: 'Buyer management'
   },
-  { 
-    icon: Receipt, 
-    label: 'Manage Invoices', 
-    pathname: '/dashboard/admin/invoices', 
-    roles: ['admin'],
-    description: 'Invoice management'
-  },
+
   { 
     icon: CreditCard, 
     label: 'Manage Payments', 

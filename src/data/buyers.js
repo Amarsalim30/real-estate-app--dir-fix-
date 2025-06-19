@@ -39,6 +39,7 @@ export const Buyers = [
   },
   {
     id: 3,
+    buyerId: 3,
     firstName: "Michael",
     lastName: "Brown",
     email: "michael.brown@email.com",

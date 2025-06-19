@@ -1,4 +1,4 @@
-export const Payments = [
+export const PaymentDetails = [
   {
     id: 1,
     paymentNumber: "PAY-2023-001",
