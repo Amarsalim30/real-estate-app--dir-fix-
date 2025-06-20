@@ -1,7 +1,8 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
+// import { Projects } from '@/data/projects';
+import { useProjectsQuery } from '@/hooks/queries/useProjectsQuery';
 import { Units } from '@/data/units';
 import { formatPrice } from '@/utils/format';
 import {
@@ -150,6 +151,9 @@ export default function ProjectDetailPage() {
   const [unitsViewMode, setUnitsViewMode] = useState('grid');
   const [unitsFilter, setUnitsFilter] = useState('all');
   const [unitsSortBy, setUnitsSortBy] = useState('unitNumber');
+    const { data, isLoading, error } = useProjectsQuery();
+    const Projects = data || [];
+  
 
   const project = Projects.find(p => p.id === parseInt(params.projectId));
 

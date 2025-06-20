@@ -1,8 +1,9 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
-import  ProjectCard  from '@/components/projects/projectCard';
+// import { Units } from '@/data/units';
+import ProjectCard from '@/components/projects/projectCard';
+import { useProjectsQuery } from '@/hooks/queries/useProjectsQuery';
+import { useUnitQuery } from '@/hooks/queries/useUnitsQuery';
 
 import { 
   Search, 
@@ -38,7 +39,9 @@ export default function ProjectsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('name'); // name, price, progress, date
   const [sortOrder, setSortOrder] = useState('asc');
-  
+  const { data: Units } = useUnitQuery();
+
+
   // Filter states
   const [filters, setFilters] = useState({
     status: 'all',
@@ -65,16 +68,28 @@ export default function ProjectsPage() {
   };
 
   // Get unique values for filters
-  const filterOptions = useMemo(() => {
-    const locations = [...new Set(Projects.map(p => p.location))];
-    const allAmenities = [...new Set(Projects.flatMap(p => p.amenities || []))];
-    
+const { data, isLoading, error } = useProjectsQuery();
+const Projects = Array.isArray(data) ? data : []; // Ensure Projects is always an array
+
+const filterOptions = useMemo(() => {
+  // Only process if Projects is an array and not empty
+  if (!Array.isArray(Projects) || Projects.length === 0) {
     return {
-      locations,
-      amenities: allAmenities,
+      locations: [],
+      amenities: [],
       statuses: ['planning', 'under_construction', 'completed']
     };
-  }, []);
+  }
+
+  const locations = [...new Set(Projects.map(p => p.location))];
+  const allAmenities = [...new Set(Projects.flatMap(p => p.amenities || []))];
+  
+  return {
+    locations,
+    amenities: allAmenities,
+    statuses: ['planning', 'under_construction', 'completed']
+  };
+}, [Projects]);
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
@@ -85,7 +100,7 @@ export default function ProjectsPage() {
         const matchesSearch = 
           project.name.toLowerCase().includes(searchLower) ||
           project.description.toLowerCase().includes(searchLower) ||
-                    project.location.toLowerCase().includes(searchLower) ||
+          project.location.toLowerCase().includes(searchLower) ||
           project.developer.toLowerCase().includes(searchLower);
         
         if (!matchesSearch) return false;
@@ -103,7 +118,7 @@ export default function ProjectsPage() {
 
       // Price range filter
       if (filters.priceRange !== 'all') {
-        const projectUnits = Units.filter(unit => unit.projectId === project.id);
+        const projectUnits = Units.filter(unit => String(unit.projectId) === String(project.id));
         const prices = projectUnits.map(unit => unit.price).filter(price => price > 0);
         const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
         const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
@@ -195,7 +210,7 @@ export default function ProjectsPage() {
     });
 
     return filtered;
-  }, [searchTerm, filters, sortBy, sortOrder]);
+  }, [searchTerm, filters, sortBy, sortOrder, Projects]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -230,7 +245,11 @@ export default function ProjectsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      
+    {isLoading ? (
+      <p className="text-center py-8 text-gray-600">Loading...</p>
+    ) : error ? (
+      <p className="text-center py-8 text-red-600">Something went wrong.</p>
+    ) : (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -261,7 +280,7 @@ export default function ProjectsPage() {
             <div className="flex items-center space-x-4">
               {/* Sort */}
               <select
-                  value={`${sortBy}-${sortOrder}`}
+                value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [sort, order] = e.target.value.split('-');
                   setSortBy(sort);
@@ -577,7 +596,7 @@ export default function ProjectsPage() {
           </div>
         </div>
       </div>
+    )}
     </div>
   );
 }
-

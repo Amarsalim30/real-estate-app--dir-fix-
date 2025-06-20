@@ -1,19 +1,18 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-import { users } from "@/data/user";
 
 export const authOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
       credentials: {
-        identifier: { 
-          label: "Email or Username", 
-          type: "text", 
-          placeholder: "Enter email or username" 
+        identifier: {
+          label: "Email or Username",
+          type: "text",
+          placeholder: "Enter email or username",
         },
-        password: { 
-          label: "Password", 
-          type: "password" 
+        password: {
+          label: "Password",
+          type: "password",
         },
       },
       async authorize(credentials) {
@@ -22,21 +21,33 @@ export const authOptions = {
             throw new Error("Please provide both email/username and password");
           }
 
-          const { identifier, password } = credentials;
+          const isEmail = credentials.identifier.includes("@");
+          const payload = isEmail
+            ? { email: credentials.identifier, password: credentials.password }
+            : { username: credentials.identifier, password: credentials.password };
 
-          const user = users.find(
-            u =>
-              (u.email === identifier || u.username === identifier) &&
-              u.password === password
-          );
+          // Choose endpoint based on identifier type
+          const endpoint = isEmail
+            ? "http://localhost:8080/api/users/login-email"
+            : "http://localhost:8080/api/users/login";
 
-          if (!user) {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload), // Correct payload serialization
+          });
+
+          if (!response.ok) {
             throw new Error("Invalid credentials");
           }
 
+          const user = await response.json();
+
           return {
             id: user.id.toString(),
-            name: user.username,
+            name: user.username || user.email.split("@")[0],
             email: user.email,
             role: user.role,
           };
@@ -67,9 +78,7 @@ export const authOptions = {
       return token;
     },
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
