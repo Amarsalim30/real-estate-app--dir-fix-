@@ -1,17 +1,56 @@
 'use client';
-import { useState } from 'react';
+import { useState ,useMemo} from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
-import { Payments } from '@/data/payments';
-import { Invoices } from '@/data/invoices';
+// import { Units } from '@/data/units';
+// import { projects } from '@/data/projects';
+// import { Payments } from '@/data/payments';
+// import { Invoices } from '@/data/invoices';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+import { usePayments } from '@/hooks/usePayments';
+import { useInvoices } from '@/hooks/useInvoices';
+import { formatPrice } from '@/utils/format';
 
 export default function UnitDetailPage() {
   const params = useParams();
+  const { projects , loading } = useProjects();
+  const { units } = useUnits();
+  const { payments } = usePayments();
+  const { invoices } = useInvoices();
   const unitId = parseInt(params.unitId);
-  const unit = Units.find(u => u.id == unitId);
   
+  const unit = useMemo(() => {
+  if (!units || !Array.isArray(units) || !params?.unitId) return null;
+  return units.find(u => u.id == parseInt(params.unitId));
+}, [units, params?.unitId]);
+
+const project = useMemo(() => {
+  if (!projects || !Array.isArray(projects) || !unit?.projectId) return null;
+  return projects.find(p => p.id === unit.projectId);
+}, [projects, unit?.projectId]);
+
+const unitPayments = useMemo(() => {
+  if (!payments || !Array.isArray(payments) || !params?.unitId) return [];
+  return payments.filter(p => p.unitId === parseInt(params.unitId));
+}, [payments, params?.unitId]);
+
+const unitInvoices = useMemo(() => {
+  if (!invoices || !Array.isArray(invoices) || !params?.unitId) return [];
+  return invoices.filter(i => i.unitId === parseInt(params.unitId));
+}, [invoices, params?.unitId]);
+
+
+if (loading) {
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    </div>
+  );
+}
+
   if (!unit) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -26,30 +65,19 @@ export default function UnitDetailPage() {
     );
   }
 
-  const project = Projects.find(p => p.id === unit.projectId);
-  const unitPayments = Payments.filter(p => p.unitId === unitId);
-  const unitInvoices = Invoices.filter(i => i.unitId === unitId);
-
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available':
+      case 'AVAILABLE':
         return 'bg-green-100 text-green-800';
-      case 'reserved':
+      case 'RESERVED':
         return 'bg-yellow-100 text-yellow-800';
-      case 'sold':
+      case 'SOLD':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
 
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -91,10 +119,7 @@ export default function UnitDetailPage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Unit Number</label>
-                  <p className="text-lg font-semibold text-gray-900">{unit.unitNumber}</p>
-                </div>
+                
                             <div>
                   <label className="block text-sm font-medium text-gray-700">Unit Number</label>
                   <p className="text-lg font-semibold text-gray-900">{unit.unitNumber}</p>
@@ -143,21 +168,22 @@ export default function UnitDetailPage() {
           </div>
 
           {/* Features */}
-          {unit.features && unit.features.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {unit.features.map((feature, index) => (
-                  <div key={index} className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-gray-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+         {unit.features && Array.isArray(unit.features) && unit.features.length > 0 && (
+  <div className="bg-white rounded-lg shadow-sm border p-6">
+    <h2 className="text-xl font-semibold text-gray-900 mb-4">Features</h2>
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      {unit.features.map((feature, index) => (
+        <div key={index} className="flex items-center">
+          <svg className="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          <span className="text-gray-700">{feature}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
 
           {/* Project Information */}
           {project && (
@@ -187,9 +213,9 @@ export default function UnitDetailPage() {
           )}
 
           {/* Payments History */}
-          {unitPayments.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment History</h2>
+{unitPayments && unitPayments.length > 0 && (
+  <div className="bg-white rounded-lg shadow-sm border p-6">
+    <h2 className="text-xl font-semibold text-gray-900 mb-4">Payment History</h2>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
@@ -244,7 +270,7 @@ export default function UnitDetailPage() {
           )}
 
           {/* Invoices */}
-          {unitInvoices.length > 0 && (
+          {unitInvoices && unitInvoices.length > 0 && (
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Invoices</h2>
               <div className="space-y-4">
@@ -306,63 +332,36 @@ export default function UnitDetailPage() {
                 </span>
               </div>
               
-              {unit.status === 'reserved' && unit.reservedBy && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Reserved By</label>
-                    <p className="text-gray-900">Buyer ID: {unit.reservedBy}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Reserved Date</label>
-                    <p className="text-gray-900">{formatDate(unit.reservedDate)}</p>
-                  </div>
-                </>
-              )}
-              
-              {unit.status === 'sold' && unit.soldTo && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Sold To</label>
-                    <p className="text-gray-900">Buyer ID: {unit.soldTo}</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Sold Date</label>
-                    <p className="text-gray-900">{formatDate(unit.soldDate)}</p>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+{unit.status === 'reserved' && unit.reservedBy && (
+  <>
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Reserved By</label>
+      <p className="text-gray-900">Buyer ID: {unit.reservedBy}</p>
+    </div>
+    {unit.reservedDate && (
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Reserved Date</label>
+        <p className="text-gray-900">{formatDate(unit.reservedDate)}</p>
+      </div>
+    )}
+  </>
+)}
 
-          {/* Financial Summary */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Financial Summary</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Unit Price:</span>
-                <span className="font-semibold">{formatPrice(unit.price)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Price per sq ft:</span>
-                <span className="font-semibold">{formatPrice(Math.round(unit.price / unit.sqft))}</span>
-              </div>
-              {unitPayments.length > 0 && (
-                <>
-                  <hr className="my-3" />
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Total Payments:</span>
-                    <span className="font-semibold text-green-600">
-                      {formatPrice(unitPayments.reduce((sum, payment) => 
-                        payment.status === 'completed' ? sum + payment.amount : sum, 0
-                      ))}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Payment Count:</span>
-                    <span className="font-semibold">{unitPayments.length}</span>
-                  </div>
-                </>
-              )}
+{unit.status === 'sold' && unit.soldTo && (
+  <>
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Sold To</label>
+      <p className="text-gray-900">Buyer ID: {unit.soldTo}</p>
+    </div>
+    {unit.soldDate && (
+      <div>
+        <label className="block text-sm font-medium text-gray-700">Sold Date</label>
+        <p className="text-gray-900">{formatDate(unit.soldDate)}</p>
+      </div>
+    )}
+  </>
+)}
+
             </div>
           </div>
 

@@ -1,10 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
+// import { Units } from '@/data/units';
 import { useSession } from 'next-auth/react';
 import { formatPrice } from '@/utils/format';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+
 import { 
   ArrowLeft, 
   CreditCard, 
@@ -20,6 +23,8 @@ export default function UnitPurchasePage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
+  const { projects, loading: isLoading, error } = useProjects();
+  const { units } = useUnits();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -60,9 +65,25 @@ export default function UnitPurchasePage() {
     return null;
   }
 
-  const unit = Array.isArray(Units) ? Units.find(u => u.id === parseInt(params.unitId)) : null;
-  const project = Array.isArray(Projects) ? Projects.find(p => p.id === parseInt(params.projectId)) : null;
-  
+const unit = useMemo(() => {
+  if (!units || !Array.isArray(units) || !params?.unitId) return null;
+  return units.find(u => u.id === parseInt(params.unitId));
+}, [units, params?.unitId]);
+
+const project = useMemo(() => {
+  if (!projects || !Array.isArray(projects) || !params?.projectId) return null;
+  return projects.find(p => p.id === parseInt(params.projectId));
+}, [projects, params?.projectId]);
+
+if (isLoading) {
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
+
+
   if (!unit || !project) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -184,8 +205,9 @@ export default function UnitPurchasePage() {
     { number: 4, title: 'Review & Submit', description: 'Review and confirm purchase' },
   ];
 
-  const taxAmount = unit.price * 0.08;
-  const totalAmount = unit.price + taxAmount;
+const taxAmount = unit?.price ? unit.price * 0.08 : 0;
+const totalAmount = unit?.price ? unit.price + taxAmount : 0;
+
   const downPaymentAmount = formData.downPayment ? parseFloat(formData.downPayment) : 0;
   const financingAmount = totalAmount - downPaymentAmount;
 

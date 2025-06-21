@@ -1,9 +1,13 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-// import { Projects } from '@/data/projects';
+// import { projects } from '@/data/projects';
 import { useProjectsQuery } from '@/hooks/queries/useProjectsQuery';
-import { Units } from '@/data/units';
+// import { Units } from '@/data/units';
+
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+
 import { formatPrice } from '@/utils/format';
 import {
   ArrowLeft,
@@ -151,30 +155,22 @@ export default function ProjectDetailPage() {
   const [unitsViewMode, setUnitsViewMode] = useState('grid');
   const [unitsFilter, setUnitsFilter] = useState('all');
   const [unitsSortBy, setUnitsSortBy] = useState('unitNumber');
-    const { data, isLoading, error } = useProjectsQuery();
-    const Projects = data || [];
-  
+  const { projects, loading: isLoading, error } = useProjects();
+  const { units } = useUnits();
 
-  const project = Projects.find(p => p.id === parseInt(params.projectId));
+  const project = useMemo(() => {
+    if (!projects || !Array.isArray(projects) || !params?.projectId) {
+      return null;
+    }
+    return projects.find(p => p.id === parseInt(params.projectId));
+  }, [projects, params?.projectId]);
 
-  if (!project) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Project Not Found</h1>
-          <button
-            onClick={() => router.push('/projects')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Projects
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const projectUnits = Units.filter(unit => unit.projectId === project.id);
+  const projectUnits = useMemo(() => {
+    if (!units || !Array.isArray(units) || !project?.id) {
+      return [];
+    }
+    return units.filter(unit => unit.projectId === project.id);
+  }, [units, project?.id]);
 
   // Calculate project statistics
   const stats = useMemo(() => {
@@ -230,6 +226,32 @@ export default function ProjectDetailPage() {
     return filtered;
   }, [projectUnits, unitsFilter, unitsSortBy]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Project Not Found</h1>
+          <button
+            onClick={() => router.push('/projects')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Back to projects
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'completed':
@@ -275,7 +297,7 @@ export default function ProjectDetailPage() {
           className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Projects
+          Back to projects
         </button>
 
         {/* Hero Section */}

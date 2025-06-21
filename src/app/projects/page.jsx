@@ -1,9 +1,10 @@
 'use client';
 import { useState, useMemo } from 'react';
-// import { Units } from '@/data/units';
+// import { units } from '@/data/units';
 import ProjectCard from '@/components/projects/projectCard';
-import { useProjectsQuery } from '@/hooks/queries/useProjectsQuery';
-import { useUnitQuery } from '@/hooks/queries/useUnitsQuery';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+import  Link  from 'next/link';
 
 import { 
   Search, 
@@ -39,8 +40,8 @@ export default function ProjectsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('name'); // name, price, progress, date
   const [sortOrder, setSortOrder] = useState('asc');
-  const { data: Units } = useUnitQuery();
-
+  const { projects , loading: isLoading, error } = useProjects();
+  const { units  } = useUnits();
 
   // Filter states
   const [filters, setFilters] = useState({
@@ -67,13 +68,10 @@ export default function ProjectsPage() {
     }));
   };
 
-  // Get unique values for filters
-const { data, isLoading, error } = useProjectsQuery();
-const Projects = Array.isArray(data) ? data : []; // Ensure Projects is always an array
-
 const filterOptions = useMemo(() => {
-  // Only process if Projects is an array and not empty
-  if (!Array.isArray(Projects) || Projects.length === 0) {
+  // Only process if projects is an array and not empty
+  if (!projects || !Array.isArray(projects) || projects.length === 0) {
+
     return {
       locations: [],
       amenities: [],
@@ -81,19 +79,23 @@ const filterOptions = useMemo(() => {
     };
   }
 
-  const locations = [...new Set(Projects.map(p => p.location))];
-  const allAmenities = [...new Set(Projects.flatMap(p => p.amenities || []))];
+  const locations = [...new Set(projects.map(p => p.location))];
+  const allAmenities = [...new Set(projects.flatMap(p => p.amenities || []))];
   
   return {
     locations,
     amenities: allAmenities,
     statuses: ['planning', 'under_construction', 'completed']
   };
-}, [Projects]);
+}, [projects]);
 
   // Filter and sort projects
-  const filteredProjects = useMemo(() => {
-    let filtered = Projects.filter(project => {
+const filteredProjects = useMemo(() => {
+  if (!projects || !Array.isArray(projects)) {
+    return [];
+  }
+  let filtered = projects.filter(project => {
+
       // Search filter
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
@@ -116,9 +118,11 @@ const filterOptions = useMemo(() => {
         return false;
       }
 
-      // Price range filter
-      if (filters.priceRange !== 'all') {
-        const projectUnits = Units.filter(unit => String(unit.projectId) === String(project.id));
+// Price range filter
+if (filters.priceRange !== 'all') {
+  if (!units || !Array.isArray(units)) return true; // Skip filter if units not available
+  const projectUnits = units.filter(unit => String(unit.projectId) === String(project.id));
+
         const prices = projectUnits.map(unit => unit.price).filter(price => price > 0);
         const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
         const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
@@ -149,7 +153,7 @@ const filterOptions = useMemo(() => {
 
       // Availability filter
       if (filters.availability !== 'all') {
-        const projectUnits = Units.filter(unit => unit.projectId === project.id);
+        const projectUnits = units.filter(unit => unit.projectId === project.id);
         const availableUnits = projectUnits.filter(unit => unit.status === 'available').length;
         
         switch (filters.availability) {
@@ -178,18 +182,18 @@ const filterOptions = useMemo(() => {
           bValue = b.name.toLowerCase();
           break;
         case 'price':
-          const aUnits = Units.filter(unit => unit.projectId === a.id);
-          const bUnits = Units.filter(unit => unit.projectId === b.id);
+          const aUnits = units.filter(unit => unit.projectId === a.id);
+          const bUnits = units.filter(unit => unit.projectId === b.id);
           const aPrices = aUnits.map(unit => unit.price).filter(price => price > 0);
           const bPrices = bUnits.map(unit => unit.price).filter(price => price > 0);
           aValue = aPrices.length > 0 ? Math.min(...aPrices) : 0;
           bValue = bPrices.length > 0 ? Math.min(...bPrices) : 0;
           break;
         case 'progress':
-          const aTotalUnits = Units.filter(unit => unit.projectId === a.id).length;
-          const aSoldUnits = Units.filter(unit => unit.projectId === a.id && (unit.status === 'sold' || unit.status === 'reserved')).length;
-          const bTotalUnits = Units.filter(unit => unit.projectId === b.id).length;
-          const bSoldUnits = Units.filter(unit => unit.projectId === b.id && (unit.status === 'sold' || unit.status === 'reserved')).length;
+          const aTotalUnits = units.filter(unit => unit.projectId === a.id).length;
+          const aSoldUnits = units.filter(unit => unit.projectId === a.id && (unit.status === 'sold' || unit.status === 'reserved')).length;
+          const bTotalUnits = units.filter(unit => unit.projectId === b.id).length;
+          const bSoldUnits = units.filter(unit => unit.projectId === b.id && (unit.status === 'sold' || unit.status === 'reserved')).length;
           aValue = aTotalUnits > 0 ? (aSoldUnits / aTotalUnits) : 0;
           bValue = bTotalUnits > 0 ? (bSoldUnits / bTotalUnits) : 0;
           break;
@@ -210,7 +214,7 @@ const filterOptions = useMemo(() => {
     });
 
     return filtered;
-  }, [searchTerm, filters, sortBy, sortOrder, Projects]);
+  }, [searchTerm, filters, sortBy, sortOrder, projects,units]);
 
   const handleFilterChange = (filterType, value) => {
     setFilters(prev => ({
@@ -253,10 +257,18 @@ const filterOptions = useMemo(() => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Our Projects</h1>
-          <p className="text-xl text-gray-600">
-            Discover premium real estate developments across prime locations
-          </p>
+<h1 className="text-4xl font-bold text-gray-900 mb-4">Our projects</h1>
+<p className="text-xl text-gray-600 mb-4">
+  Discover premium real estate developments across prime locations
+</p>
+
+<div className="flex justify-end">
+  <button className="flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+    <Building className="w-4 h-4 mr-2" />
+    <Link href="/projects/new">Add New Project</Link> 
+  </button>
+</div>
+
         </div>
 
         {/* Search and Controls */}
@@ -503,8 +515,8 @@ const filterOptions = useMemo(() => {
                 >
                   <div className="space-y-2">
                     {[
-                      { value: 'all', label: 'All Projects' },
-                      { value: 'available', label: 'Units Available' },
+                      { value: 'all', label: 'All projects' },
+                      { value: 'available', label: 'units Available' },
                       { value: 'limited', label: 'Limited Availability' },
                       { value: 'sold-out', label: 'Sold Out' }
                     ].map(option => (
@@ -547,7 +559,7 @@ const filterOptions = useMemo(() => {
             </div>
           )}
 
-          {/* Projects Grid/List */}
+          {/* projects Grid/List */}
           <div className="flex-1">
             {/* Results Header */}
             <div className="flex items-center justify-between mb-6">
@@ -563,7 +575,7 @@ const filterOptions = useMemo(() => {
               </div>
             </div>
 
-            {/* Projects Display */}
+            {/* projects Display */}
             {filteredProjects.length > 0 ? (
               <div className={
                 viewMode === 'grid' 
@@ -581,7 +593,7 @@ const filterOptions = useMemo(() => {
             ) : (
               <div className="text-center py-12">
                 <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Projects Found</h3>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No projects Found</h3>
                 <p className="text-gray-600 mb-6">
                   Try adjusting your search criteria or filters to find more projects.
                 </p>

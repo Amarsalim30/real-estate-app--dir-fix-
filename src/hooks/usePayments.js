@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { paymentsApi } from '@/lib/api';
+import { paymentsApi } from '@/lib/api/payments';
 
 export const usePayments = (params = {}) => {
   const [payments, setPayments] = useState([]);

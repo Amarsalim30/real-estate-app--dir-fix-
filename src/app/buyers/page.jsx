@@ -3,11 +3,11 @@ import { useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Buyers } from '@/data/buyers';
-import { Invoices } from '@/data/invoices';
-import { Payments } from '@/data/payments';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
+import { useBuyers } from '@/hooks/useBuyers';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
 import { formatPrice } from '@/utils/format';
 import { ROLES, hasPermission } from '@/lib/roles';
 import Link from 'next/link';
@@ -225,13 +225,24 @@ function BuyersContent() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [viewMode, setViewMode] = useState('table'); // table or cards
   const [showFilters, setShowFilters] = useState(false);
+  const { projects, loading: isLoading, error } = useProjects();
+  const { buyers } = useBuyers();
+  const { units } = useUnits();
+  const { invoices } = useInvoices();
+  const { payments } = usePayments();
+
 
   // Calculate buyer statistics
   const buyersWithStats = useMemo(() => {
-    return Buyers.map(buyer => {
-      const buyerInvoices = Invoices.filter(inv => inv.buyerId === buyer.id);
-      const buyerPayments = Payments.filter(pay => pay.buyerId === buyer.id);
-      const buyerUnits = Units.filter(unit => 
+    if (!buyers || !Array.isArray(buyers)) return [];
+    if (!invoices || !Array.isArray(invoices)) return [];
+    if (!payments || !Array.isArray(payments)) return [];
+    if (!units || !Array.isArray(units)) return [];
+
+    return buyers.map(buyer => {
+      const buyerInvoices = invoices.filter(inv => inv.buyerId === buyer.id);
+      const buyerPayments = payments.filter(pay => pay.buyerId === buyer.id);
+      const buyerUnits = units.filter(unit => 
         unit.soldTo === buyer.id || unit.reservedBy === buyer.id
       );
 
@@ -251,10 +262,14 @@ function BuyersContent() {
         }
       };
     });
-  }, []);
+  }, [buyers, invoices, payments, units]);
 
   // Filter and sort buyers
   const filteredBuyers = useMemo(() => {
+    if (!buyersWithStats || !Array.isArray(buyersWithStats)) {
+      return [];
+    }
+    
     let filtered = buyersWithStats;
 
     // Search filter
@@ -350,6 +365,14 @@ function BuyersContent() {
     };
   }, [filteredBuyers]);
 
+    if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
   const handleViewBuyer = (buyer) => {
     router.push(`/buyers/${buyer.id}`);
   };
@@ -542,7 +565,7 @@ function BuyersContent() {
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {filteredBuyers.length} of {Buyers.length} buyers
+              Showing {filteredBuyers?.length || 0} of {buyers?.length || 0} buyers
             </span>
             <div className="flex items-center space-x-4">
               <span>Active: {summaryStats.active}</span>

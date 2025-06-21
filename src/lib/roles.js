@@ -1,8 +1,8 @@
 export const ROLES = {
-  ADMIN: "admin",
+  ADMIN: "ADMIN",
   MANAGER: "manager", 
   CASHIER: "cashier",
-  USER: "user",
+  USER: "USER",
 };
 
 export const ROLE_PERMISSIONS = {

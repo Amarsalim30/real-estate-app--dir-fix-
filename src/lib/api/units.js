@@ -4,7 +4,7 @@ export const unitsApi = {
   // Get all units
   getAll: async (params = {}) => {
     try {
-      const response = await api.get('/units', { params });
+      const response = await api.get('/units/all', { params });
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch units');

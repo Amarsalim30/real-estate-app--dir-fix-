@@ -29,42 +29,42 @@ const sidebarItems = [
     icon: BarChart3, 
     label: 'Dashboard', 
     pathname: '/dashboard', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'Overview and analytics'
   },
   { 
     icon: Building, 
     label: 'Projects', 
     pathname: '/projects', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'View all projects'
   },
   { 
     icon: Home, 
     label: 'Units', 
     pathname: '/units', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'Browse available units'
   },
   { 
     icon: Users, 
     label: 'Buyers', 
     pathname: '/buyers', 
-    roles: ['admin'],
+    roles: ['ADMIN'],
     description: 'Manage buyers'
   },
   { 
     icon: Receipt, 
     label: 'Invoices', 
     pathname: '/invoices', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'View invoices'
   },
   { 
     icon: CreditCard, 
     label: 'Payments', 
     pathname: '/payments', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'Payment history'
   },
   // Admin-only management sections
@@ -72,28 +72,28 @@ const sidebarItems = [
   //   icon: BarChart3, 
   //   label: 'Admin Dashboard', 
   //   pathname: '/dashboard/admin', 
-  //   roles: ['admin'],
+  //   roles: ['ADMIN'],
   //   description: 'Administrative overview'
   // },
   // { 
   //   icon: Building, 
   //   label: 'Manage Projects', 
   //   pathname: '/dashboard/admin/projects', 
-  //   roles: ['admin'],
+  //   roles: ['ADMIN'],
   //   description: 'Project management'
   // },
   // { 
   //   icon: Home, 
   //   label: 'Manage Units', 
   //   pathname: '/dashboard/admin/units', 
-  //   roles: ['admin'],
+  //   roles: ['ADMIN'],
   //   description: 'Unit management'
   // },
   { 
     icon: Users, 
     label: 'Manage Buyers', 
     pathname: '/dashboard/admin/buyers', 
-    roles: ['admin'],
+    roles: ['ADMIN'],
     description: 'Buyer management'
   },
 
@@ -101,7 +101,7 @@ const sidebarItems = [
     icon: CreditCard, 
     label: 'Manage Payments', 
     pathname: '/dashboard/admin/payments', 
-    roles: ['admin'],
+    roles: ['ADMIN'],
     description: 'Payment management'
   },
   // Help sections
@@ -109,14 +109,14 @@ const sidebarItems = [
     icon: HelpCircle, 
     label: 'FAQ', 
     pathname: '/faq', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'Frequently asked questions'
   },
   { 
     icon: Settings, 
     label: 'Help Center', 
     pathname: '/help-center', 
-    roles: ['admin', 'user'],
+    roles: ['ADMIN', 'USER'],
     description: 'Get support'
   },
 ];
@@ -216,7 +216,7 @@ const UserProfile = ({ user, collapsed }) => {
               {user.name || 'User'}
             </div>
             <div className="text-xs text-gray-500 truncate flex items-center">
-              {user.role === 'admin' && <Shield className="w-3 h-3 mr-1" />}
+              {user.role === 'ADMIN' && <Shield className="w-3 h-3 mr-1" />}
               {user.email}
             </div>
           </div>
@@ -357,7 +357,7 @@ export default function Sidebar({ collapsed, toggleSidebar }) {
         </SidebarSection>
 
         {/* Admin Section */}
-        {user.role === 'admin' && adminItems.length > 0 && (
+        {user.role === 'ADMIN' && adminItems.length > 0 && (
           <SidebarSection title="Administration" collapsed={collapsed}>
             <div className="space-y-1">
               {adminItems.map((item) => (

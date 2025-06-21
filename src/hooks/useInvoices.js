@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { invoicesApi } from '@/lib/api';
+import { invoicesApi } from '@/lib/api/invoices';
 
 export const useInvoices = (params = {}) => {
   const [invoices, setInvoices] = useState([]);

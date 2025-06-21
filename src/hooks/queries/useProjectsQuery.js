@@ -4,7 +4,7 @@ import { projectsApi } from '@/lib/api/projects';
 export const useProjectsQuery = (params = {}) => {
   return useQuery({
     queryKey: ['projects', params],
-    queryFn: () => projectsApi.getAll(params),
+    queryFn: () => projectsApi.getAll(params).then((res) => res.data),
     keepPreviousData: true,
   });
 };

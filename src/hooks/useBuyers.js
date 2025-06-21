@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { buyersApi } from '@/lib/api';
+import { buyersApi } from '@/lib/api/buyers';
 
 export const useBuyers = (params = {}) => {
   const [buyers, setBuyers] = useState([]);

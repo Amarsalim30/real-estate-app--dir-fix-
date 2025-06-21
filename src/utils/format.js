@@ -1,11 +1,11 @@
 export const formatPrice = (price) => {
   if (typeof price !== 'number' || isNaN(price)) {
-    return '$0';
+    return 'KES 0';
   }
-  
-  return new Intl.NumberFormat('en-US', {
+
+  return new Intl.NumberFormat('en-KE', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'KES',
     maximumFractionDigits: 0,
   }).format(price);
 };
@@ -16,20 +16,18 @@ export const formatPriceRange = (min, max) => {
 
 export const formatCompactPrice = (price) => {
   if (typeof price !== 'number' || isNaN(price)) {
-    return '$0';
+    return 'KES 0';
   }
 
   if (price >= 1000000) {
-    return `$${(price / 1000000).toFixed(1)}M`;
+    return `KES ${(price / 1000000).toFixed(1)}M`;
   } else if (price >= 1000) {
-    return `$${(price / 1000).toFixed(0)}K`;
+    return `KES ${(price / 1000).toFixed(0)}K`;
   }
-  
+
   return formatPrice(price);
 };
 
-const formatNumber = (num) => {
-  return new Intl.NumberFormat('en-US').format(num);
+export const formatNumber = (num) => {
+  return new Intl.NumberFormat('en-KE').format(num);
 };
-
-export { formatPrice, formatNumber };

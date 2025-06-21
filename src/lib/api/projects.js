@@ -1,10 +1,11 @@
 import api from '../api';
 
-export const projectsApi = {
+export const projectsApi = {    
   // Get all projects
   getAll: async (params = {}) => {
     try {
       const response = await api.get('/projects', { params });
+        console.log("Projects API Response:", response.data);
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch projects');

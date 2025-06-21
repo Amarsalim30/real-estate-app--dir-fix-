@@ -3,8 +3,11 @@ import { Settings, User, UserCog, LogOut, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { signOut } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
+
 
 export default function SettingsDropdown() {
+    const { data: session } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
 
@@ -81,11 +84,12 @@ export default function SettingsDropdown() {
                     <div className="px-4 py-3 border-b border-gray-100/50">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-r from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">JD</span>
+                                <span className="text-white font-semibold text-sm">  {session?.user?.name?.charAt(0).toUpperCase()}
+</span>
                             </div>
                             <div>
-                                <p className="font-semibold text-gray-900 text-sm">John Doe</p>
-                                <p className="text-gray-500 text-xs">john@estate.com</p>
+                                <p className="font-semibold text-gray-900 text-sm">{session.user.name || buyer?.firstName || 'User'}!</p>
+                                <p className="text-gray-500 text-xs">{session.user.email || buyer?.email || 'setEmail'}!</p>
                             </div>
                         </div>
                     </div>

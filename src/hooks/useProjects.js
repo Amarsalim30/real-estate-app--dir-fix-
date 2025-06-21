@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { projectsApi } from '@/lib/api';
+import { projectsApi } from '@/lib/api/projects';
 
 export const useProjects = (params = {}) => {
   const [projects, setProjects] = useState([]);
@@ -79,4 +79,35 @@ export const useProject = (id) => {
   };
 
   return { project, loading, error, refetch };
+};
+
+
+export const useCreateProject = () => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const createProject = async (projectData, options = {}) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const data = await projectsApi.create(projectData);
+      
+      if (options.onSuccess) {
+        options.onSuccess(data);
+      }
+      
+      return data;
+    } catch (err) {
+      setError(err.message);
+      if (options.onError) {
+        options.onError(err);
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { createProject, isLoading, error };
 };

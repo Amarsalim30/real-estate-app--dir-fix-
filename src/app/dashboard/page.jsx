@@ -1,17 +1,21 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, use } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Invoices, InvoiceStatuses } from '@/data/invoices';
-import { Payments, PaymentStatuses } from '@/data/payments';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
-import { Buyers } from '@/data/buyers';
+// import { Invoices, InvoiceStatuses } from '@/data/invoices';
+// import { Payments, PaymentStatuses } from '@/data/payments';
+
+import { usePayments } from '@/hooks/usePayments';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useBuyers } from '@/hooks/useBuyers';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
-import { 
+import {
   Building,
   CreditCard,
   FileText,
@@ -41,7 +45,7 @@ import {
 } from 'lucide-react';
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, trend, onClick }) => (
-  <div 
+  <div
     className={`bg-white rounded-lg shadow-sm border p-6 hover:shadow-md transition-shadow ${onClick ? 'cursor-pointer' : ''}`}
     onClick={onClick}
   >
@@ -97,12 +101,11 @@ const RecentActivityItem = ({ icon: Icon, title, description, date, status, colo
       <p className="text-xs text-gray-500 mt-1">{date}</p>
     </div>
     {status && (
-      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-        status === 'completed' ? 'bg-green-100 text-green-800' :
-        status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-        status === 'overdue' ? 'bg-red-100 text-red-800' :
-        'bg-gray-100 text-gray-800'
-      }`}>
+      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${status === 'completed' ? 'bg-green-100 text-green-800' :
+          status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+            status === 'overdue' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+        }`}>
         {status}
       </span>
     )}
@@ -110,18 +113,17 @@ const RecentActivityItem = ({ icon: Icon, title, description, date, status, colo
 );
 
 const PropertyCard = ({ unit, project, status, onClick }) => (
-  <div 
+  <div
     className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
     onClick={onClick}
   >
     <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative">
       <div className="absolute inset-0 bg-black bg-opacity-20"></div>
       <div className="absolute top-4 left-4">
-        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-          status === 'sold' ? 'bg-green-100 text-green-800' :
-          status === 'reserved' ? 'bg-yellow-100 text-yellow-800' :
-          'bg-blue-100 text-blue-800'
-        }`}>
+        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${status === 'sold' ? 'bg-green-100 text-green-800' :
+            status === 'reserved' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-blue-100 text-blue-800'
+          }`}>
           {status === 'sold' ? 'Owned' : status === 'reserved' ? 'Reserved' : 'Available'}
         </span>
       </div>
@@ -147,121 +149,163 @@ function DashboardContent() {
   const { data: session } = useSession();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('overview');
+  const { projects, loading: isLoading, error } = useProjects();
+  const { buyers } = useBuyers();
+  const { units } = useUnits();
+  const { payments } =usePayments();
+  const { invoices } =useInvoices();
+const InvoiceStatuses = {
+  PAID: 'paid',
+  PENDING: 'pending',
+  OVERDUE: 'overdue'
+};
+
+const PaymentStatuses = {
+  COMPLETED: 'completed',
+  PENDING: 'pending',
+  FAILED: 'failed'
+};
+
+
 
   // Get user's buyer information
-  const getUserBuyerId = () => {
-    if (session?.user?.buyerId) {
-      return session.user.buyerId;
-    }
-    
-    const buyer = Buyers.find(b => b.email === session?.user?.email);
-    return buyer?.id || null;
-  };
+ const getUserBuyerId = () => {
+  if (session?.user?.buyerId) {
+    return session.user.buyerId;
+  }
+
+  // Add safety check for buyers array
+  if (!buyers || !Array.isArray(buyers)) {
+    return null;
+  }
+  
+  const buyer = buyers.find(b => b.email === session?.user?.email);
+  return buyer?.id || null;
+};
 
   const userBuyerId = getUserBuyerId();
-  const buyer = Buyers.find(b => b.id === userBuyerId);
+const buyer = buyers && Array.isArray(buyers) ? buyers.find(b => b.id === userBuyerId) : null;
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
   // Get user's data
-  const userInvoices = useMemo(() => {
-    if (isAdmin) return Invoices;
-    return Invoices.filter(invoice => invoice.buyerId === userBuyerId);
-  }, [userBuyerId, isAdmin]);
+const userInvoices = useMemo(() => {
+  if (!invoices || !Array.isArray(invoices)) return [];
+  if (isAdmin) return invoices;
+  return invoices.filter(invoice => invoice.buyerId === userBuyerId);
+}, [userBuyerId, isAdmin, invoices]);
 
-  const userPayments = useMemo(() => {
-    if (isAdmin) return Payments;
-    return Payments.filter(payment => payment.buyerId === userBuyerId);
-  }, [userBuyerId, isAdmin]);
+const userPayments = useMemo(() => {
+  if (!payments || !Array.isArray(payments)) return [];
+  if (isAdmin) return payments;
+  return payments.filter(payment => payment.buyerId === userBuyerId);
+}, [userBuyerId, isAdmin, payments]);
 
-  const userUnits = useMemo(() => {
-    if (isAdmin) return Units;
-    return Units.filter(unit => 
-      unit.soldTo === userBuyerId || unit.reservedBy === userBuyerId
-    );
-  }, [userBuyerId, isAdmin]);
+const userUnits = useMemo(() => {
+  if (!units || !Array.isArray(units)) return [];
+  if (isAdmin) return units;
+  return units.filter(unit =>
+    unit.soldToId === userBuyerId || unit.reservedById === userBuyerId
+  );
+}, [userBuyerId, isAdmin, units]);
 
   // Calculate statistics
-  const stats = useMemo(() => {
-    const totalInvoices = userInvoices.length;
-    const paidInvoices = userInvoices.filter(i => i.status === InvoiceStatuses.PAID).length;
-    const pendingInvoices = userInvoices.filter(i => i.status === InvoiceStatuses.PENDING).length;
-    const overdueInvoices = userInvoices.filter(i => 
-      i.status === InvoiceStatuses.PENDING && new Date(i.dueDate) < new Date()
-    ).length;
+const stats = useMemo(() => {
+  const safeInvoices = userInvoices || [];
+  const safePayments = userPayments || [];
+  const safeUnits = userUnits || [];
+  
+  const totalInvoices = safeInvoices.length;
+  const paidInvoices = safeInvoices.filter(i => i.status === InvoiceStatuses.PAID).length;
+  const pendingInvoices = safeInvoices.filter(i => i.status === InvoiceStatuses.PENDING).length;
+  const overdueInvoices = safeInvoices.filter(i =>
+    i.status === InvoiceStatuses.PENDING && new Date(i.dueDate) < new Date()
+  ).length;
 
-    const totalAmount = userInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const paidAmount = userInvoices
-      .filter(i => i.status === InvoiceStatuses.PAID)
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const pendingAmount = userInvoices
-      .filter(i => i.status === InvoiceStatuses.PENDING)
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
+  const totalAmount = safeInvoices.reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
+  const paidAmount = safeInvoices
+    .filter(i => i.status === InvoiceStatuses.PAID)
+    .reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
+  const pendingAmount = safeInvoices
+    .filter(i => i.status === InvoiceStatuses.PENDING)
+    .reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
 
-    const completedPayments = userPayments.filter(p => p.status === PaymentStatuses.COMPLETED).length;
-    const totalPaymentAmount = userPayments
-      .filter(p => p.status === PaymentStatuses.COMPLETED)
-      .reduce((sum, payment) => sum + payment.amount, 0);
+  const completedPayments = safePayments.filter(p => p.status === PaymentStatuses.COMPLETED).length;
+  const totalPaymentAmount = safePayments
+    .filter(p => p.status === PaymentStatuses.COMPLETED)
+    .reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
-    const ownedUnits = userUnits.filter(u => u.soldTo === userBuyerId).length;
-    const reservedUnits = userUnits.filter(u => u.reservedBy === userBuyerId).length;
+  const ownedUnits = safeUnits.filter(u => u.soldToId === userBuyerId).length;
+  const reservedUnits = safeUnits.filter(u => u.reservedById === userBuyerId).length;
 
-    return {
-      totalInvoices,
-      paidInvoices,
-      pendingInvoices,
-      overdueInvoices,
-      totalAmount,
-      paidAmount,
-      pendingAmount,
-      completedPayments,
-      totalPaymentAmount,
-      ownedUnits,
-      reservedUnits
-    };
-  }, [userInvoices, userPayments, userUnits, userBuyerId]);
+  return {
+    totalInvoices,
+    paidInvoices,
+    pendingInvoices,
+    overdueInvoices,
+    totalAmount,
+    paidAmount,
+    pendingAmount,
+    completedPayments,
+    totalPaymentAmount,
+    ownedUnits,
+    reservedUnits
+  };
+}, [userInvoices, userPayments, userUnits, userBuyerId]);
 
   // Recent activity
-  const recentActivity = useMemo(() => {
-    const activities = [];
+const recentActivity = useMemo(() => {
+  const activities = [];
+  const safePayments = userPayments || [];
+  const safeInvoices = userInvoices || [];
 
-    // Add recent payments
-    userPayments
-      .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
-      .slice(0, 3)
-      .forEach(payment => {
-        activities.push({
-          id: `payment-${payment.id}`,
-          icon: CreditCard,
-          title: 'Payment Processed',
-          description: `${formatPrice(payment.amount)} payment completed`,
-          date: new Date(payment.paymentDate).toLocaleDateString(),
-          status: payment.status,
-          color: 'text-green-600'
-        });
+  // Add recent payments
+  safePayments
+    .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
+    .slice(0, 3)
+    .forEach(payment => {
+      activities.push({
+        id: `payment-${payment.id}`,
+        icon: CreditCard,
+        title: 'Payment Processed',
+        description: `${formatPrice(payment.amount)} payment completed`,
+        date: new Date(payment.paymentDate).toLocaleDateString(),
+        status: payment.status,
+        color: 'text-green-600'
       });
+    });
 
-    // Add recent invoices
-    userInvoices
-      .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate))
-      .slice(0, 2)
-      .forEach(invoice => {
-        const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
-                         new Date(invoice.dueDate) < new Date();
-        activities.push({
-          id: `invoice-${invoice.id}`,
-          icon: FileText,
-          title: 'Invoice Generated',
-          description: `Invoice ${invoice.invoiceNumber} for ${formatPrice(invoice.totalAmount)}`,
-          date: new Date(invoice.issueDate).toLocaleDateString(),
-          status: isOverdue ? 'overdue' : invoice.status,
-          color: 'text-blue-600'
-        });
+  // Add recent invoices
+  safeInvoices
+    .sort((a, b) => new Date(b.issueDate) - new Date(a.issueDate))
+    .slice(0, 2)
+    .forEach(invoice => {
+      const isOverdue = invoice.status === InvoiceStatuses.PENDING &&
+        new Date(invoice.dueDate) < new Date();
+      activities.push({
+        id: `invoice-${invoice.id}`,
+        icon: FileText,
+        title: 'Invoice Generated',
+        description: `Invoice ${invoice.invoiceNumber} for ${formatPrice(invoice.totalAmount)}`,
+        date: new Date(invoice.issueDate).toLocaleDateString(),
+        status: isOverdue ? 'overdue' : invoice.status,
+        color: 'text-blue-600'
       });
+    });
 
-    return activities
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 5);
-  }, [userPayments, userInvoices]);
+  return activities
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+}, [userPayments, userInvoices]);
+
+
+      if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
 
   if (!session?.user) {
     return (
@@ -284,13 +328,13 @@ function DashboardContent() {
               Welcome back, {session.user.name || buyer?.firstName || 'User'}!
             </h1>
             <p className="text-gray-600 mt-1">
-              {isAdmin 
-                ? 'Here\'s your admin dashboard overview' 
+              {isAdmin
+                ? 'Here\'s your admin dashboard overview'
                 : 'Here\'s what\'s happening with your properties and account'
               }
             </p>
           </div>
-          
+
         </div>
       </div>
 
@@ -322,14 +366,14 @@ function DashboardContent() {
           </div>
         </div>
       )}
-          {/* Stats Cards */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {isAdmin ? (
           <>
             <StatCard
               title="Total Properties"
-              value={Units.length}
-              subtitle={`${Units.filter(u => u.status === 'available').length} available`}
+              value={units.length}
+              subtitle={`${units.filter(u => u.status === 'available').length} available`}
               icon={Building}
               color="text-blue-600"
               onClick={() => router.push('/units')}
@@ -352,7 +396,7 @@ function DashboardContent() {
             />
             <StatCard
               title="Total Buyers"
-              value={Buyers.length}
+              value={buyers.length}
               subtitle="Registered buyers"
               icon={User}
               color="text-orange-600"
@@ -413,11 +457,10 @@ function DashboardContent() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${
-                      activeTab === tab.id
+                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
                         ? 'border-blue-500 text-blue-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
+                      }`}
                   >
                     <Icon className="w-4 h-4 mr-2" />
                     {tab.name}
@@ -566,7 +609,7 @@ function DashboardContent() {
           {userUnits.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {userUnits.map((unit) => {
-                const project = Projects.find(p => p.id === unit.projectId);
+                const project = projects.find(p => p.id === unit.projectId);
                 const status = unit.soldTo === userBuyerId ? 'sold' : 'reserved';
                 return (
                   <PropertyCard
@@ -636,8 +679,8 @@ function DashboardContent() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {userInvoices.slice(0, 5).map((invoice) => {
-                      const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
-                                       new Date(invoice.dueDate) < new Date();
+                      const isOverdue = invoice.status === InvoiceStatuses.PENDING &&
+                        new Date(invoice.dueDate) < new Date();
                       return (
                         <tr key={invoice.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
@@ -665,17 +708,16 @@ function DashboardContent() {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                              invoice.status === InvoiceStatuses.PAID ? 'bg-green-100 text-green-800' :
-                              isOverdue ? 'bg-red-100 text-red-800' :
-                              'bg-yellow-100 text-yellow-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${invoice.status === InvoiceStatuses.PAID ? 'bg-green-100 text-green-800' :
+                                isOverdue ? 'bg-red-100 text-red-800' :
+                                  'bg-yellow-100 text-yellow-800'
+                              }`}>
                               {invoice.status === InvoiceStatuses.PAID ? 'Paid' : isOverdue ? 'Overdue' : 'Pending'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                             <div className="flex items-center justify-end space-x-2">
-                                                          <Link
+                              <Link
                                 href={`/invoices/${invoice.id}`}
                                 className="text-blue-600 hover:text-blue-900 p-1 rounded"
                                 title="View Invoice"
@@ -781,11 +823,10 @@ function DashboardContent() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            payment.status === PaymentStatuses.COMPLETED ? 'bg-green-100 text-green-800' :
-                            payment.status === PaymentStatuses.PENDING ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${payment.status === PaymentStatuses.COMPLETED ? 'bg-green-100 text-green-800' :
+                              payment.status === PaymentStatuses.PENDING ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                            }`}>
                             {payment.status}
                           </span>
                         </td>
@@ -828,7 +869,7 @@ function DashboardContent() {
       {!isAdmin && activeTab === 'profile' && buyer && (
         <div className="space-y-6">
           <h2 className="text-2xl font-bold text-gray-900">My Profile</h2>
-          
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Personal Information */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
@@ -844,24 +885,24 @@ function DashboardContent() {
                     <p className="text-gray-900">{buyer.lastName}</p>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Email Address</label>
                   <p className="text-gray-900">{buyer.email}</p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Phone Number</label>
                   <p className="text-gray-900">{buyer.phone}</p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Date of Birth</label>
                   <p className="text-gray-900">
                     {buyer.dateOfBirth ? new Date(buyer.dateOfBirth).toLocaleDateString() : 'Not provided'}
                   </p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Occupation</label>
                   <p className="text-gray-900">{buyer.occupation || 'Not provided'}</p>
@@ -877,7 +918,7 @@ function DashboardContent() {
                   <label className="block text-sm font-medium text-gray-600 mb-1">Street Address</label>
                   <p className="text-gray-900">{buyer.address}</p>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">City</label>
@@ -888,12 +929,12 @@ function DashboardContent() {
                     <p className="text-gray-900">{buyer.state}</p>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">ZIP Code</label>
                   <p className="text-gray-900">{buyer.zipCode}</p>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Preferred Contact Method</label>
                   <p className="text-gray-900 capitalize">{buyer.preferredContactMethod || 'Email'}</p>
@@ -911,30 +952,28 @@ function DashboardContent() {
                     <p className="text-gray-900">{formatPrice(buyer.annualIncome)}</p>
                   </div>
                 )}
-                
+
                 {buyer.creditScore && (
                   <div>
                     <label className="block text-sm font-medium text-gray-600 mb-1">Credit Score</label>
                     <div className="flex items-center">
                       <p className="text-gray-900 mr-2">{buyer.creditScore}</p>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        buyer.creditScore >= 750 ? 'bg-green-100 text-green-800' :
-                        buyer.creditScore >= 700 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${buyer.creditScore >= 750 ? 'bg-green-100 text-green-800' :
+                          buyer.creditScore >= 700 ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                        }`}>
                         {buyer.creditScore >= 750 ? 'Excellent' :
-                         buyer.creditScore >= 700 ? 'Good' : 'Fair'}
+                          buyer.creditScore >= 700 ? 'Good' : 'Fair'}
                       </span>
                     </div>
                   </div>
                 )}
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Account Status</label>
                   <div className="flex items-center">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                      stats.overdueInvoices > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${stats.overdueInvoices > 0 ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'
+                      }`}>
                       {stats.overdueInvoices > 0 ? 'Action Required' : 'Good Standing'}
                     </span>
                   </div>
@@ -952,35 +991,35 @@ function DashboardContent() {
                     {new Date(buyer.createdAt).toLocaleDateString()}
                   </span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Properties Owned</span>
                   <span className="font-medium text-gray-900">{stats.ownedUnits}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Properties Reserved</span>
                   <span className="font-medium text-gray-900">{stats.reservedUnits}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Invested</span>
                   <span className="font-medium text-green-600">{formatPrice(stats.paidAmount)}</span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Outstanding Balance</span>
                   <span className={`font-medium ${stats.pendingAmount > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                     {formatPrice(stats.pendingAmount)}
                   </span>
                 </div>
-                
+
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">Total Payments Made</span>
                   <span className="font-medium text-gray-900">{stats.completedPayments}</span>
                 </div>
               </div>
-                           <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="mt-6 pt-4 border-t border-gray-200">
                 <button className="w-full flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                   <Settings className="w-4 h-4 mr-2" />
                   Update Profile Information
@@ -1009,28 +1048,28 @@ function DashboardContent() {
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Performance</h3>
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Units Sold This Month</span>
+                  <span className="text-gray-600">units Sold This Month</span>
                   <span className="text-2xl font-bold text-green-600">
-                    {Units.filter(u => u.status === 'sold').length}
+                    {units.filter(u => u.status === 'sold').length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Units Reserved</span>
+                  <span className="text-gray-600">units Reserved</span>
                   <span className="text-2xl font-bold text-yellow-600">
-                    {Units.filter(u => u.status === 'reserved').length}
+                    {units.filter(u => u.status === 'reserved').length}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">Available Units</span>
+                  <span className="text-gray-600">Available units</span>
                   <span className="text-2xl font-bold text-blue-600">
-                    {Units.filter(u => u.status === 'available').length}
+                    {units.filter(u => u.status === 'available').length}
                   </span>
                 </div>
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600">Conversion Rate</span>
                     <span className="text-lg font-semibold text-gray-900">
-                      {((Units.filter(u => u.status === 'sold').length / Units.length) * 100).toFixed(1)}%
+                      {((units.filter(u => u.status === 'sold').length / units.length) * 100).toFixed(1)}%
                     </span>
                   </div>
                 </div>
@@ -1056,7 +1095,7 @@ function DashboardContent() {
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">Average Sale Price</span>
                   <span className="text-lg font-semibold text-gray-900">
-                    {formatPrice(Units.reduce((sum, unit) => sum + unit.price, 0) / Units.length)}
+                    {formatPrice(units.reduce((sum, unit) => sum + unit.price, 0) / units.length)}
                   </span>
                 </div>
                 <div className="pt-4 border-t border-gray-200">
@@ -1072,6 +1111,7 @@ function DashboardContent() {
           </div>
 
           {/* Recent Transactions */}
+          {isAdmin && (
           <div className="bg-white rounded-lg shadow-sm border p-6 mb-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-900">Recent Transactions</h3>
@@ -1091,7 +1131,7 @@ function DashboardContent() {
                 </Link>
               </div>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="min-w-full">
                 <thead>
@@ -1105,21 +1145,20 @@ function DashboardContent() {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...Payments, ...Invoices.map(inv => ({...inv, type: 'invoice'}))]
-                    .sort((a, b) => new Date(b.paymentDate || b.issueDate) - new Date(a.paymentDate || a.issueDate))
-                    .slice(0, 8)
-                    .map((transaction) => {
-                      const isPayment = transaction.paymentDate;
-                      const buyer = Buyers.find(b => b.id === transaction.buyerId);
-                      return (
-                        <tr key={`${isPayment ? 'payment' : 'invoice'}-${transaction.id}`} className="border-b border-gray-100">
+                  {[...(payments || []), ...(invoices || []).map(inv => ({ ...inv, type: 'invoice' }))]
+            .sort((a, b) => new Date(b.paymentDate || b.issueDate) - new Date(a.paymentDate || a.issueDate))
+            .slice(0, 8)
+            .map((transaction) => {
+              const isPayment = transaction.paymentDate;
+              const buyer = buyers ? buyers.find(b => b.id === transaction.buyerId) : null;
+              return (
+                <tr key={`${isPayment ? 'payment' : 'invoice'}-${transaction.id}`} className="border-b border-gray-100">
                           <td className="py-3 text-sm text-gray-900">
                             {new Date(transaction.paymentDate || transaction.issueDate).toLocaleDateString()}
                           </td>
                           <td className="py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              isPayment ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${isPayment ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                              }`}>
                               {isPayment ? 'Payment' : 'Invoice'}
                             </span>
                           </td>
@@ -1130,11 +1169,10 @@ function DashboardContent() {
                             {formatPrice(transaction.amount || transaction.totalAmount)}
                           </td>
                           <td className="py-3">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              transaction.status === 'completed' || transaction.status === 'paid' ? 'bg-green-100 text-green-800' :
-                              transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${transaction.status === 'completed' || transaction.status === 'paid' ? 'bg-green-100 text-green-800' :
+                                transaction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                              }`}>
                               {transaction.status}
                             </span>
                           </td>
@@ -1153,6 +1191,7 @@ function DashboardContent() {
               </table>
             </div>
           </div>
+          )}
         </>
       )}
 
