@@ -47,7 +47,9 @@ export const authOptions = {
 
           return {
             id: user.id.toString(),
-            name: user.username || user.email.split("@")[0],
+            firstName: user.firstName,
+            lastName: user.lastName,
+            username: user.username || user.email.split("@")[0],
             email: user.email,
             role: user.role,
           };
@@ -67,6 +69,11 @@ export const authOptions = {
       if (token) {
         session.user.id = token.id;
         session.user.role = token.role;
+        session.user.username = token.username;
+        session.user.email = token.email;
+        session.user.firstName = token.firstName;
+        session.user.lastName = token.lastName;
+
       }
       return session;
     },
@@ -74,6 +81,10 @@ export const authOptions = {
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.username = user.username;
+        token.email = user.email;
+        token.firstName = user.firstName;
+        token.lastName = user.lastName;
       }
       return token;
     },
@@ -86,7 +97,7 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 30 * 15, 
   },
   debug: process.env.NODE_ENV === "development",
 };

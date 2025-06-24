@@ -22,6 +22,11 @@ export default withAuth(
       console.warn("🚫 Access denied: Login required for dashboard");
       return NextResponse.redirect(new URL("/login", req.url));
     }
+        // Authenticated user but not admin
+    if (pathname.startsWith("/units") && !token) {
+      console.warn("🚫 Access denied: Login required for units-sell");
+      return NextResponse.redirect(new URL("/login", req.url));
+    }
 
     return NextResponse.next();
   },

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 
 
 export default function SettingsDropdown() {
+    const router = useRouter();
     const { data: session } = useSession();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef(null);
@@ -31,7 +32,7 @@ export default function SettingsDropdown() {
             label: 'Profile',
             description: 'Manage your personal information',
             onClick: () => {
-                console.log('Profile clicked');
+                router.push('/dashboard/profile');
                 setIsOpen(false);
             }
         },
@@ -39,7 +40,16 @@ export default function SettingsDropdown() {
             icon: UserCog,
             label: 'Account Settings',
             description: 'Privacy, security & preferences',
+/*************  ✨ Windsurf Command ⭐  *************/
+        /**
+         * onClick function for Account Settings menu item.
+         * - Navigates to /dashboard/account-settings
+         * - Logs 'Account Settings clicked' to the console
+         * - Closes the settings dropdown
+         */
+/*******  527abb49-0f2b-4372-8803-4959a9ace683  *******/
             onClick: () => {
+                router.push('/dashboard/account-settings');
                 console.log('Account Settings clicked');
                 setIsOpen(false);
             }
@@ -48,18 +58,18 @@ export default function SettingsDropdown() {
             icon: LogOut,
             label: 'Logout',
             description: 'Sign out of your account',
-            onClick: () => {
-                new Promise((resolve, reject) => {
-                    setTimeout(() => {
-                        // Simulate logout API call
-                        toast.success('Logged out successfully!');
-                    }, 1000);
-                })
-                console.log('Logout clicked');
-                setIsOpen(false);
-                signOut({ callbackUrl: "/login" });
-
+            onClick: async () => {
+                try {
+                    setIsOpen(false); // Close UI immediately
+                    toast.success('Logging out...');
+                    await signOut({ callbackUrl: "/login", redirect: true }); // Ensure session is cleared and redirected
+                    console.log('User signed out');
+                } catch (err) {
+                    console.error('Sign out failed:', err);
+                    toast.error('Logout failed. Try again.');
+                }
             },
+
             isLogout: true
         }
     ];
@@ -74,7 +84,11 @@ export default function SettingsDropdown() {
                     : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
                     }`}
             >
-                <Settings className="w-5 h-5" />
+                <div className="w-6 h-6 bg-gradient-to-r from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
+                    <span className="text-white font-semibold text-sm">  {session?.user?.firstName?.charAt(0).toUpperCase()+session?.user?.lastName?.charAt(0).toUpperCase() || 'U'}
+                        
+                        </span>
+                </div>
             </button>
 
             {/* Dropdown Menu */}
@@ -84,12 +98,12 @@ export default function SettingsDropdown() {
                     <div className="px-4 py-3 border-b border-gray-100/50">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-r from-teal-500 to-blue-600 rounded-full flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">  {session?.user?.name?.charAt(0).toUpperCase()}
-</span>
+                                <span className="text-white font-semibold text-sm">  {session?.user?.firstName?.charAt(0).toUpperCase()+session?.user?.lastName?.charAt(0).toUpperCase()}
+                                </span>
                             </div>
                             <div>
-                                <p className="font-semibold text-gray-900 text-sm">{session.user.name || buyer?.firstName || 'User'}!</p>
-                                <p className="text-gray-500 text-xs">{session.user.email || buyer?.email || 'setEmail'}!</p>
+                                <p className="font-semibold text-gray-900 text-sm">{session.user.username  || 'User'}!</p>
+                                <p className="text-gray-500 text-xs">{session.user.email  || 'setEmail'}!</p>
                             </div>
                         </div>
                     </div>

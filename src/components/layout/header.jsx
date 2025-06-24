@@ -18,19 +18,19 @@ export default function Header({}) {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <input
               type="text"
-              placeholder="Type to search..."
+              placeholder="Search Property here..."
               className="pl-10 pr-4 py-2 border placeholder-gray-300 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button className="p-2 text-gray-400 hover:text-gray-600">
-            <Bell className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="flex items-center space-x-4">
-         <SettingsDropdown session={session}/>
+                    <button className="p-2 text-gray-400 hover:text-gray-600">
+            <Bell className="w-5 h-5" />
+          </button>
+         <SettingsDropdown />
         </div>
       </div>
     </div>

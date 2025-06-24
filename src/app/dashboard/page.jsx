@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo, use } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
@@ -325,7 +325,7 @@ const recentActivity = useMemo(() => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome back, {session.user.name || buyer?.firstName || 'User'}!
+              Welcome back, {session.user.username || buyer?.firstName || 'User'}!
             </h1>
             <p className="text-gray-600 mt-1">
               {isAdmin
@@ -1242,6 +1242,13 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  },[status, session, router])
+
+
   if (status === 'loading') {
     return (
       <DashboardLayout>
@@ -1252,10 +1259,6 @@ export default function DashboardPage() {
     );
   }
 
-  if (!session?.user) {
-    router.push('/login');
-    return null;
-  }
 
   return (
     <DashboardLayout>

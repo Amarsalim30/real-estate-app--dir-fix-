@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Buyers } from '@/data/buyers';
-import { formatPrice } from '@/utils/formatPrice';
+import { formatPrice } from '@/lib/format';
 import UnitStatusBadge from './UnitStatusBadge';
 
 export default function UnitCard({ unit, project, showActions = false, onReserve, onSell }) {

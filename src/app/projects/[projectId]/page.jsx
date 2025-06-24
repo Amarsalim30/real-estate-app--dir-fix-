@@ -1,14 +1,10 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-// import { projects } from '@/data/projects';
-import { useProjectsQuery } from '@/hooks/queries/useProjectsQuery';
-// import { Units } from '@/data/units';
-
 import { useProjects } from '@/hooks/useProjects';
 import { useUnits } from '@/hooks/useUnits';
-
 import { formatPrice } from '@/utils/format';
+import { ConstructionStages, getConstructionStageColor, getConstructionProgressPercentage } from '@/lib/constructionStages';
 import {
   ArrowLeft,
   MapPin,
@@ -30,7 +26,10 @@ import {
   Bed,
   Bath,
   Square,
-  DollarSign
+  DollarSign,
+  Award,
+  Wrench,
+  TrendingUp
 } from 'lucide-react';
 
 const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
@@ -38,14 +37,35 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available':
+      case 'AVAILABLE':
         return 'bg-green-100 text-green-800';
-      case 'reserved':
+      case 'RESERVED':
         return 'bg-yellow-100 text-yellow-800';
-      case 'sold':
+      case 'SOLD':
         return 'bg-red-100 text-red-800';
+      case 'UNDER_CONSTRUCTION':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getUnitTypeDisplay = (unitType) => {
+    switch (unitType) {
+      case 'STUDIO':
+        return 'Studio';
+      case 'ONE_BEDROOM':
+        return '1 Bedroom';
+      case 'TWO_BEDROOM':
+        return '2 Bedroom';
+      case 'THREE_BEDROOM':
+        return '3 Bedroom';
+      case 'FOUR_BEDROOM':
+        return '4 Bedroom';
+      case 'PENTHOUSE':
+        return 'Penthouse';
+      default:
+        return unitType?.replace('_', ' ') || 'Unknown';
     }
   };
 
@@ -61,14 +81,26 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
-            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
+            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center relative">
               <Building className="w-8 h-8 text-gray-400" />
+              {unit.isFeatured && (
+                <div className="absolute -top-1 -right-1">
+                  <Award className="w-4 h-4 text-yellow-500" />
+                </div>
+              )}
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                Unit {unit.unitNumber}
-              </h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Unit {unit.unitNumber}
+                </h3>
+                {unit.isFeatured && (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                    Featured
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 text-sm mb-2">{unit.description}</p>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <span className="flex items-center">
@@ -83,7 +115,15 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
                   <Square className="w-4 h-4 mr-1" />
                   {unit.sqft} sq ft
                 </span>
+                <span className="text-blue-600 font-medium">
+                  {getUnitTypeDisplay(unit.unitType)}
+                </span>
               </div>
+              {unit.floor && (
+                <div className="text-sm text-gray-500 mt-1">
+                  Floor {unit.floor}
+                </div>
+              )}
             </div>
           </div>
 
@@ -91,9 +131,16 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             <div className="text-2xl font-bold text-gray-900 mb-2">
               {formatPrice(unit.price)}
             </div>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
-              {unit.status.charAt(0).toUpperCase() + unit.status.slice(1)}
-            </span>
+            <div className="flex flex-col gap-1">
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
+                {unit.status?.replace('_', ' ')}
+              </span>
+              {unit.currentConstructionStage && (
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentConstructionStage)}`}>
+                  {ConstructionStages[unit.currentConstructionStage]?.label}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -107,17 +154,37 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
     >
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
         <Building className="w-16 h-16 text-gray-400" />
-        <div className="absolute top-4 right-4">
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
-            {unit.status.charAt(0).toUpperCase() + unit.status.slice(1)}
+            {unit.status?.replace('_', ' ')}
           </span>
+          {unit.currentConstructionStage && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentConstructionStage)}`}>
+              <Wrench className="w-3 h-3 inline mr-1" />
+              {ConstructionStages[unit.currentConstructionStage]?.label}
+            </span>
+          )}
         </div>
+        {unit.isFeatured && (
+          <div className="absolute top-4 left-4">
+            <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-medium flex items-center">
+              <Award className="w-3 h-3 mr-1" />
+              Featured
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-          Unit {unit.unitNumber}
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+            Unit {unit.unitNumber}
+          </h3>
+          <span className="text-sm text-blue-600 font-medium">
+            {getUnitTypeDisplay(unit.unitType)}
+          </span>
+        </div>
+        
         <p className="text-gray-600 text-sm mb-4 line-clamp-2">{unit.description}</p>
 
         <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
@@ -133,6 +200,11 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             <Square className="w-4 h-4 mr-1" />
             {unit.sqft} sq ft
           </span>
+          {unit.floor && (
+            <span className="text-xs text-gray-500">
+              Floor {unit.floor}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -175,9 +247,10 @@ export default function ProjectDetailPage() {
   // Calculate project statistics
   const stats = useMemo(() => {
     const total = projectUnits.length;
-    const available = projectUnits.filter(u => u.status === 'available').length;
-    const reserved = projectUnits.filter(u => u.status === 'reserved').length;
-    const sold = projectUnits.filter(u => u.status === 'sold').length;
+    const available = projectUnits.filter(u => u.status === 'AVAILABLE').length;
+    const reserved = projectUnits.filter(u => u.status === 'RESERVED').length;
+    const sold = projectUnits.filter(u => u.status === 'SOLD').length;
+    const underConstruction = projectUnits.filter(u => u.status === 'UNDER_CONSTRUCTION').length;
 
     const prices = projectUnits.map(u => u.price).filter(p => p > 0);
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
@@ -186,26 +259,45 @@ export default function ProjectDetailPage() {
 
     const salesProgress = total > 0 ? ((sold + reserved) / total * 100) : 0;
 
+    // Construction stage breakdown
+    const stageBreakdown = projectUnits.reduce((acc, unit) => {
+      if (unit.currentConstructionStage) {
+        acc[unit.currentConstructionStage] = (acc[unit.currentConstructionStage] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    // Overall project construction progress
+    const projectConstructionProgress = project?.currentConstructionStage 
+      ? getConstructionProgressPercentage(project.currentConstructionStage)
+      : 0;
+
     return {
       total,
       available,
       reserved,
       sold,
+      underConstruction,
       minPrice,
       maxPrice,
       avgPrice,
-      salesProgress
+      salesProgress,
+      stageBreakdown,
+      projectConstructionProgress
     };
-  }, [projectUnits]);
+  }, [projectUnits, project]);
 
   // Filter and sort units
   const filteredUnits = useMemo(() => {
     let filtered = projectUnits;
 
     if (unitsFilter !== 'all') {
-      filtered = filtered.filter(unit => unit.status === unitsFilter);
+      if (unitsFilter === 'featured') {
+        filtered = filtered.filter(unit => unit.isFeatured);
+      } else {
+        filtered = filtered.filter(unit => unit.status === unitsFilter);
+      }
     }
-
     filtered.sort((a, b) => {
       switch (unitsSortBy) {
         case 'unitNumber':
@@ -218,6 +310,16 @@ export default function ProjectDetailPage() {
           return a.sqft - b.sqft;
         case 'size-desc':
           return b.sqft - a.sqft;
+        case 'floor-asc':
+          return (a.floor || 0) - (b.floor || 0);
+        case 'floor-desc':
+          return (b.floor || 0) - (a.floor || 0);
+        case 'featured':
+          return b.isFeatured - a.isFeatured;
+        case 'construction-progress':
+          const aProgress = getConstructionProgressPercentage(a.currentConstructionStage || 'PLANNING');
+          const bProgress = getConstructionProgressPercentage(b.currentConstructionStage || 'PLANNING');
+          return bProgress - aProgress;
         default:
           return 0;
       }
@@ -251,14 +353,15 @@ export default function ProjectDetailPage() {
     );
   }
 
-
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
+      case 'COMPLETED':
         return CheckCircle;
-      case 'under_construction':
+      case 'UNDER_CONSTRUCTION':
         return Clock;
-      case 'planning':
+      case 'PLANNING':
+        return AlertCircle;
+      case 'ON_HOLD':
         return AlertCircle;
       default:
         return Building;
@@ -267,12 +370,14 @@ export default function ProjectDetailPage() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
+      case 'COMPLETED':
         return 'bg-green-100 text-green-800';
-      case 'under_construction':
+      case 'UNDER_CONSTRUCTION':
         return 'bg-blue-100 text-blue-800';
-      case 'planning':
+      case 'PLANNING':
         return 'bg-yellow-100 text-yellow-800';
+      case 'ON_HOLD':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -283,6 +388,7 @@ export default function ProjectDetailPage() {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'units', label: `Units (${stats.total})` },
+    { id: 'construction', label: 'Construction Progress' },
     { id: 'amenities', label: 'Amenities' },
     { id: 'location', label: 'Location' },
     { id: 'gallery', label: 'Gallery' }
@@ -324,15 +430,26 @@ export default function ProjectDetailPage() {
                 <div className="flex items-center mb-4">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white`}>
                     <StatusIcon className="w-4 h-4 mr-2" />
-                    {project.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {project.status?.replace('_', ' ')}
                   </span>
+                  {project.currentConstructionStage && (
+                    <span className="ml-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium">
+                      <TrendingUp className="w-4 h-4 mr-2 inline" />
+                      {ConstructionStages[project.currentConstructionStage]?.label} - {stats.projectConstructionProgress}%
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-4xl font-bold mb-2">{project.name}</h1>
                 <div className="flex items-center text-lg mb-4">
                   <MapPin className="w-5 h-5 mr-2" />
-                  {project.location}
+                  {project.address}, {project.subCounty}, {project.county}
                 </div>
                 <p className="text-lg opacity-90 max-w-2xl">{project.description}</p>
+                {project.developerName && (
+                  <div className="mt-4 text-sm opacity-75">
+                    Developer: {project.developerName}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -349,7 +466,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">{stats.total}</div>
             <div className="text-gray-600">Total Units</div>
@@ -363,10 +480,14 @@ export default function ProjectDetailPage() {
             <div className="text-gray-600">Sold</div>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+            <div className="text-3xl font-bold text-orange-600 mb-2">{stats.projectConstructionProgress}%</div>
+            <div className="text-gray-600">Construction</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
             <div className="text-3xl font-bold text-gray-900 mb-2">
-              {stats.minPrice === stats.maxPrice ?
-                formatPrice(stats.minPrice) :
-                `${formatPrice(stats.minPrice)}`
+              {project.minPrice && project.maxPrice && project.minPrice === project.maxPrice ?
+                formatPrice(project.minPrice) :
+                formatPrice(project.minPrice || stats.minPrice)
               }
             </div>
             <div className="text-gray-600">Starting From</div>
@@ -401,10 +522,12 @@ export default function ProjectDetailPage() {
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Project Details</h3>
                     <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Developer</span>
-                        <span className="font-medium text-gray-900">{project.developer}</span>
-                      </div>
+                      {project.developerName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Developer</span>
+                          <span className="font-medium text-gray-900">{project.developerName}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Units</span>
                         <span className="font-medium text-gray-900">{stats.total}</span>
@@ -412,28 +535,53 @@ export default function ProjectDetailPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Price Range</span>
                         <span className="font-medium text-gray-900">
-                          {stats.minPrice === stats.maxPrice ?
-                            formatPrice(stats.minPrice) :
-                            `${formatPrice(stats.minPrice)} - ${formatPrice(stats.maxPrice)}`
-                          }
+                          {project.minPrice && project.maxPrice ? (
+                            project.minPrice === project.maxPrice ?
+                              formatPrice(project.minPrice) :
+                              `${formatPrice(project.minPrice)} - ${formatPrice(project.maxPrice)}`
+                          ) : (
+                            stats.minPrice === stats.maxPrice ?
+                              formatPrice(stats.minPrice) :
+                              `${formatPrice(stats.minPrice)} - ${formatPrice(stats.maxPrice)}`
+                          )}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Average Price</span>
                         <span className="font-medium text-gray-900">{formatPrice(stats.avgPrice)}</span>
                       </div>
-                      {project.expectedCompletion && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Construction Stage</span>
+                        <span className={`px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(project.currentConstructionStage || 'PLANNING')}`}>
+                          {ConstructionStages[project.currentConstructionStage || 'PLANNING']?.label}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Construction Progress</span>
+                        <span className="font-medium text-gray-900">{stats.projectConstructionProgress}%</span>
+                      </div>
+                      {project.startDate && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Expected Completion</span>
+                          <span className="text-gray-600">Start Date</span>
                           <span className="font-medium text-gray-900">
-                            {new Date(project.expectedCompletion).toLocaleDateString()}
+                            {new Date(project.startDate).toLocaleDateString()}
                           </span>
                         </div>
                       )}
-                      {project.status === 'under_construction' && (
+                      {project.targetCompletionDate && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Construction Progress</span>
-                          <span className="font-medium text-gray-900">{project.constructionProgress}%</span>
+                          <span className="text-gray-600">Target Completion</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(project.targetCompletionDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      {project.completionDate && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Completed On</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(project.completionDate).toLocaleDateString()}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -454,8 +602,8 @@ export default function ProjectDetailPage() {
                               style={{ width: `${(stats.sold / stats.total * 100)}%` }}
                             />
                             <div
-                              className="bg-yellow-50 rounded-lg"
-                              style={{ transitionDuration: '300ms', width: `${(stats.reserved / stats.total * 100)}%` }}
+                              className="bg-yellow-500 transition-all duration-300"
+                              style={{ width: `${(stats.reserved / stats.total * 100)}%` }}
                             />
                           </div>
                         </div>
@@ -466,21 +614,42 @@ export default function ProjectDetailPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 pt-4">
+                      <div className="grid grid-cols-2 gap-4 pt-4">
                         <div className="text-center p-4 bg-green-50 rounded-lg">
                           <div className="text-2xl font-bold text-green-600">{stats.sold}</div>
                           <div className="text-sm text-green-700">Sold</div>
                         </div>
                         <div className="text-center p-4 bg-yellow-50 rounded-lg">
                           <div className="text-2xl font-bold text-yellow-600">{stats.reserved}</div>
-                          <div className="text-sm text-yellow-700otlin">Reserved</div>
+                          <div className="text-sm text-yellow-700">Reserved</div>
                         </div>
                         <div className="text-center p-4 bg-blue-50 rounded-lg">
                           <div className="text-2xl font-bold text-blue-600">{stats.available}</div>
                           <div className="text-sm text-blue-700">Available</div>
                         </div>
+                        <div className="text-center p-4 bg-orange-50 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600">{stats.underConstruction}</div>
+                          <div className="text-sm text-orange-700">Under Construction</div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Construction Stage Breakdown */}
+                    {Object.keys(stats.stageBreakdown).length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="text-lg font-medium text-gray-900 mb-3">Unit Construction Stages</h4>
+                        <div className="space-y-2">
+                          {Object.entries(stats.stageBreakdown).map(([stage, count]) => (
+                            <div key={stage} className="flex justify-between items-center">
+                              <span className={`text-sm px-2 py-1 rounded-full ${getConstructionStageColor(stage)}`}>
+                                {ConstructionStages[stage]?.label || stage.replace('_', ' ')}
+                              </span>
+                              <span className="text-sm font-medium text-gray-900">{count} units</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -519,9 +688,11 @@ export default function ProjectDetailPage() {
                       className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="all">All Units ({stats.total})</option>
-                      <option value="available">Available ({stats.available})</option>
-                      <option value="reserved">Reserved ({stats.reserved})</option>
-                      <option value="sold">Sold ({stats.sold})</option>
+                      <option value="AVAILABLE">Available ({stats.available})</option>
+                      <option value="RESERVED">Reserved ({stats.reserved})</option>
+                      <option value="SOLD">Sold ({stats.sold})</option>
+                      <option value="UNDER_CONSTRUCTION">Under Construction ({stats.underConstruction})</option>
+                      <option value="featured">Featured Units</option>
                     </select>
 
                     <select
@@ -534,6 +705,10 @@ export default function ProjectDetailPage() {
                       <option value="price-desc">Price: High to Low</option>
                       <option value="size-asc">Size: Small to Large</option>
                       <option value="size-desc">Size: Large to Small</option>
+                      <option value="floor-asc">Floor: Low to High</option>
+                      <option value="floor-desc">Floor: High to Low</option>
+                      <option value="construction-progress">Construction Progress</option>
+                      <option value="featured">Featured First</option>
                     </select>
                   </div>
 
@@ -552,6 +727,7 @@ export default function ProjectDetailPage() {
                     </button>
                   </div>
                 </div>
+
                 {/* Units Display */}
                 {filteredUnits.length > 0 ? (
                   <div className={
@@ -580,6 +756,133 @@ export default function ProjectDetailPage() {
               </div>
             )}
 
+            {/* Construction Progress Tab */}
+            {activeTab === 'construction' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6">Construction Progress Overview</h3>
+                  
+                  {/* Overall Project Progress */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-lg font-medium text-gray-900">Overall Project Progress</h4>
+                        <p className="text-gray-600">Current stage: {ConstructionStages[project.currentConstructionStage || 'PLANNING']?.label}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-blue-600">{stats.projectConstructionProgress}%</div>
+                        <div className="text-sm text-gray-600">Complete</div>
+                      </div>
+                    </div>
+                    
+                    <div className="w-full bg-white rounded-full h-4 mb-4">
+                      <div 
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-500"
+                        style={{ width: `${stats.projectConstructionProgress}%` }}
+                      />
+                    </div>
+                    
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Started</span>
+                      <span>In Progress</span>
+                      <span>Completed</span>
+                    </div>
+                  </div>
+
+                  {/* Construction Stages Timeline */}
+                  <div className="mb-8">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Construction Stages</h4>
+                    <div className="space-y-4">
+                      {Object.entries(ConstructionStages).map(([key, stage]) => {
+                        const isCompleted = stats.projectConstructionProgress >= stage.milestone;
+                        const isCurrent = project.currentConstructionStage === key;
+                        
+                        return (
+                          <div key={key} className={`flex items-center p-4 rounded-lg border-2 transition-all ${
+                            isCurrent 
+                              ? 'border-blue-500 bg-blue-50' 
+                              : isCompleted 
+                                ? 'border-green-200 bg-green-50' 
+                                : 'border-gray-200 bg-gray-50'
+                          }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 ${
+                              isCurrent 
+                                ? 'bg-blue-500 text-white' 
+                                : isCompleted 
+                                  ? 'bg-green-500 text-white' 
+                                  : 'bg-gray-300 text-gray-600'
+                            }`}>
+                              {isCompleted ? (
+                                <CheckCircle className="w-5 h-5" />
+                              ) : isCurrent ? (
+                                <Clock className="w-5 h-5" />
+                              ) : (
+                                <span className="text-sm font-medium">{stage.milestone}</span>
+                              )}
+                            </div>
+                            
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h5 className={`font-medium ${
+                                  isCurrent ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-gray-700'
+                                }`}>
+                                  {stage.label}
+                                </h5>
+                                <span className={`text-sm px-2 py-1 rounded-full ${
+                                  isCurrent 
+                                    ? 'bg-blue-100 text-blue-800' 
+                                    : isCompleted 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {stage.milestone}% Milestone
+                                </span>
+                              </div>
+                              
+                              {isCurrent && (
+                                <p className="text-sm text-blue-700 mt-1">Currently in progress</p>
+                              )}
+                              {isCompleted && !isCurrent && (
+                                <p className="text-sm text-green-700 mt-1">Completed</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Unit Construction Breakdown */}
+                  {Object.keys(stats.stageBreakdown).length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Unit Construction Breakdown</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(stats.stageBreakdown).map(([stage, count]) => (
+                          <div key={stage} className="bg-white border rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(stage)}`}>
+                                {ConstructionStages[stage]?.label}
+                              </span>
+                              <span className="text-2xl font-bold text-gray-900">{count}</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {((count / stats.total) * 100).toFixed(1)}% of total units
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                              <div 
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{ width: `${(count / stats.total) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Amenities Tab */}
             {activeTab === 'amenities' && (
               <div className="space-y-6">
@@ -595,7 +898,7 @@ export default function ProjectDetailPage() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                                        <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">No Amenities Listed</h3>
                     <p className="text-gray-600">
                       Amenity information will be updated soon.
@@ -617,7 +920,7 @@ export default function ProjectDetailPage() {
                         <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
                         <div>
                           <div className="font-medium text-gray-900">{project.address}</div>
-                          <div className="text-gray-600">{project.city}, {project.state} {project.zipCode}</div>
+                          <div className="text-gray-600">{project.subCounty}, {project.county}</div>
                         </div>
                       </div>
                     </div>
@@ -626,7 +929,7 @@ export default function ProjectDetailPage() {
                   <div>
                     <h4 className="text-lg font-medium text-gray-900 mb-4">Neighborhood</h4>
                     <p className="text-gray-600">
-                      Located in the heart of {project.location}, this development offers easy access to
+                      Located in {project.subCounty}, {project.county}, this development offers easy access to
                       shopping, dining, entertainment, and public transportation.
                     </p>
                   </div>

@@ -31,3 +31,26 @@ export const formatCompactPrice = (price) => {
 export const formatNumber = (num) => {
   return new Intl.NumberFormat('en-KE').format(num);
 };
+
+
+export const formatPercentage = (value, decimals = 1) => {
+  if (!value || value === 0) return '0%';
+  
+  return `${value.toFixed(decimals)}%`;
+};
+
+export const formatDate = (date, options = {}) => {
+  if (!date) return '';
+  
+  const defaultOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  };
+  
+  return new Date(date).toLocaleDateString('en-US', { ...defaultOptions, ...options });
+};
+
+export const formatDateShort = (date) => {
+  return formatDate(date, { month: 'short' });
+};

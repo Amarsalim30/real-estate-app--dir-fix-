@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Units } from '@/data/units';
+import { useUnits } from '@/hooks/useUnits';
 import { formatPrice } from '@/utils/format';
 import { 
   MapPin, 
@@ -21,9 +21,11 @@ export default function ProjectCard({ project }) {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+    const { units } = useUnits();
+
 
   // Calculate project statistics
-  const projectUnits = Units.filter(unit => unit.projectId === project.id);
+  const projectUnits = units.filter(unit => unit.projectId === project.id);
   const soldUnits = projectUnits.filter(unit => unit.status === 'sold').length;
   const reservedUnits = projectUnits.filter(unit => unit.status === 'reserved').length;
   const availableUnits = projectUnits.filter(unit => unit.status === 'available').length;
@@ -161,7 +163,7 @@ export default function ProjectCard({ project }) {
           </h3>
           <div className="flex items-center text-gray-600 text-sm mb-2">
             <MapPin className="w-4 h-4 mr-1" />
-            <span>{project.location}</span>
+            <span>{project.address}</span>
           </div>
           <p className="text-gray-600 text-sm line-clamp-2">
             {project.description}

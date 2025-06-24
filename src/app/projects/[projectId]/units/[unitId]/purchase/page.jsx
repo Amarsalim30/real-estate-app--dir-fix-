@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Lock,
   Calendar,
-  DollarSign
+  DollarSign,
+  Phone,
+  Mail,
 } from 'lucide-react';
 
 export default function UnitPurchasePage() {
@@ -883,7 +885,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Unit Summary */}
-            <div className="bg-white rounded-xl shadow-sm border p-6 sticky top-8">
+            <div className="bg-white rounded-xl shadow-sm border p-6  top-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Unit Summary</h3>
               
               <div className="aspect-w-16 aspect-h-9 mb-4">

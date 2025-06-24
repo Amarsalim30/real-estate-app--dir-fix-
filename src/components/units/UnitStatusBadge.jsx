@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Units } from '@/data/units';
-import { formatPrice } from '@/utils/formatPrice';
+import { formatPrice } from '@/lib/format';
 
 export default function ProjectCard({ project }) {
   const router = useRouter();

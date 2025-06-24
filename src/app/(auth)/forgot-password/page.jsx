@@ -1,5 +1,5 @@
 import AuthLayout from "@/app/(auth)/authLayout";
-import LoginForm from "@/components/forms/login-form";
+import ForgotPasswordForm from "@/components/forms/forgot-password-form";
 import { Navbar } from "@/components/layout/navbar";
 export default function LoginPage() {
     return (
@@ -8,7 +8,7 @@ export default function LoginPage() {
             <Navbar />
                   <div className="pt-15 pb-5">
             <AuthLayout>
-                <LoginForm />
+                <ForgotPasswordForm />
             </AuthLayout>
         </div>
         </div>
