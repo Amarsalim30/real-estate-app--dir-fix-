@@ -17,7 +17,7 @@ export default function NewProjectPage() {
     address: '',
     city: '',
     state: '',
-    zipCode: '',
+    postalCode: '',
     developer: '',
     status: 'planning',
     startDate: '',
@@ -50,8 +50,8 @@ export default function NewProjectPage() {
     if (!formData.state.trim()) {
       newErrors.state = 'State is required';
     }
-    if (!formData.zipCode.trim()) {
-      newErrors.zipCode = 'ZIP code is required';
+    if (!formData.postalCode.trim()) {
+      newErrors.postalCode = 'ZIP code is required';
     }
     if (!formData.developer.trim()) {
       newErrors.developer = 'Developer is required';
@@ -296,16 +296,16 @@ export default function NewProjectPage() {
                   </label>
                   <input
                     type="text"
-                    name="zipCode"
-                    value={formData.zipCode}
+                    name="postalCode"
+                    value={formData.postalCode}
                     onChange={handleInputChange}
                     className={`w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                      errors.zipCode ? 'border-red-500' : 'border-gray-300'
+                      errors.postalCode ? 'border-red-500' : 'border-gray-300'
                     }`}
                     placeholder="10001"
                   />
-                  {errors.zipCode && (
-                    <p className="mt-1 text-sm text-red-600">{errors.zipCode}</p>
+                  {errors.postalCode && (
+                    <p className="mt-1 text-sm text-red-600">{errors.postalCode}</p>
                   )}
                 </div>
               </div>

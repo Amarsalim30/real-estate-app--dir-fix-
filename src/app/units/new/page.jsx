@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProjects';
 import { useCreateUnit } from '@/hooks/useUnits';
 import { toast } from 'sonner';
+import { ArrowLeft } from 'lucide-react';
 
 export default function NewUnitPage() {
   const router = useRouter();
@@ -126,7 +127,15 @@ export default function NewUnitPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
+                  <button
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 mr-2" />
+            Back to dashboard
+          </button>
         <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
+
           <Link href="/units" className="hover:text-blue-600">Units</Link>
           <span>/</span>
           <span className="text-gray-900">New Unit</span>

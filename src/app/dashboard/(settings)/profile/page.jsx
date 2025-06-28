@@ -105,13 +105,14 @@ export default function ProfilePage() {
   
   // Form data state
   const [formData, setFormData] = useState({
-    name: session?.user?.name || '',
+    firstName: session?.user?.firstName || '',
+    lastName: session?.user?.lastName || '',
     email: session?.user?.email || '',
     phone: session?.user?.phone || '',
     address: session?.user?.address || '',
     city: session?.user?.city || '',
     state: session?.user?.state || '',
-    zipCode: session?.user?.zipCode || '',
+    postalCode: session?.user?.postalCode || '',
     country: session?.user?.country || 'United States',
     dateOfBirth: session?.user?.dateOfBirth || '',
     occupation: session?.user?.occupation || '',
@@ -168,13 +169,14 @@ export default function ProfilePage() {
 
   const handleCancel = () => {
     setFormData({
-      name: session?.user?.name || '',
+      firstName: session?.user?.firstName || '',
+      lastName: session?.user?.lastName || '',
       email: session?.user?.email || '',
       phone: session?.user?.phone || '',
       address: session?.user?.address || '',
       city: session?.user?.city || '',
       state: session?.user?.state || '',
-      zipCode: session?.user?.zipCode || '',
+      postalCode: session?.user?.postalCode || '',
       country: session?.user?.country || 'United States',
       dateOfBirth: session?.user?.dateOfBirth || '',
       occupation: session?.user?.occupation || '',
@@ -217,7 +219,7 @@ export default function ProfilePage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600 mb-6">Please sign in to view your profile.</p>
           <button
-            onClick={() => router.push('/auth/signin')}
+            onClick={() => router.push('/login')}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Sign In
@@ -320,13 +322,21 @@ export default function ProfilePage() {
               </div>
 
               <div className="flex-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="text-gray-700 placeholder-gray-600 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <EditableField
-                    label="Full Name"
-                    value={formData.name}
+                    label="First Name"
+                    value={formData.firstName}
                     isEditing={isEditing}
-                    onChange={(value) => handleInputChange('name', value)}
-                    placeholder="Enter your full name"
+                    onChange={(value) => handleInputChange('firstName', value)}
+                    placeholder="Enter your first name"
+                    required
+                  />
+                  <EditableField
+                    label="Last Name"
+                    value={formData.lastName}
+                    isEditing={isEditing}
+                    onChange={(value) => handleInputChange('lastName', value)}
+                    placeholder="Enter your last name"
                     required
                   />
                   <EditableField
@@ -360,7 +370,7 @@ export default function ProfilePage() {
 
           {/* Address Information */}
           <ProfileSection title="Address Information" icon={MapPin}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="text-gray-700 placeholder-gray-600 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <EditableField
                   label="Street Address"
@@ -387,9 +397,9 @@ export default function ProfilePage() {
               />
               <EditableField
                 label="ZIP Code"
-                value={formData.zipCode}
+                value={formData.postalCode}
                 isEditing={isEditing}
-                onChange={(value) => handleInputChange('zipCode', value)}
+                onChange={(value) => handleInputChange('postalCode', value)}
                 placeholder="Enter your ZIP code"
               />
               <EditableField
@@ -404,7 +414,7 @@ export default function ProfilePage() {
 
           {/* Professional Information */}
           <ProfileSection title="Professional Information" icon={Building}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="text-gray-700 placeholder-gray-600 grid grid-cols-1 md:grid-cols-2 gap-4">
               <EditableField
                 label="Occupation"
                 value={formData.occupation}
@@ -420,7 +430,7 @@ export default function ProfilePage() {
                 placeholder="Enter your company name"
               />
             </div>
-            <div className="mt-4">
+            <div className="text-gray-700 placeholder-gray-600 mt-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Bio
               </label>
@@ -442,7 +452,7 @@ export default function ProfilePage() {
 
           {/* Communication Preferences */}
           <ProfileSection title="Communication Preferences" icon={Bell}>
-            <div className="space-y-4">
+            <div className=" text-gray-700 placeholder-gray-600 space-y-4">
               <EditableField
                 label="Preferred Contact Method"
                 value={formData.preferredContactMethod}

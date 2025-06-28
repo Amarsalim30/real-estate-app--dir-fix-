@@ -397,7 +397,7 @@ function BuyerProfileContent() {
                 <div>
                   <p className="text-gray-900">
                     {buyer.address}<br />
-                    {buyer.city}, {buyer.state} {buyer.zipCode}
+                    {buyer.city}, {buyer.state} {buyer.postalCode}
                   </p>
                 </div>
               </div>

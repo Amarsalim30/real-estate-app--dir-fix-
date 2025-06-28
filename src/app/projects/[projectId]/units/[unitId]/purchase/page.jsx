@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo ,useEffect} from 'react';
 import { useParams, useRouter } from 'next/navigation';
 // import { Projects } from '@/data/projects';
 // import { Units } from '@/data/units';
@@ -24,21 +24,25 @@ import {
 export default function UnitPurchasePage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const { projects, loading: isLoading, error } = useProjects();
   const { units } = useUnits();
-  
+  const [activePaymentPlan, setActivePaymentPlan] = useState(null);
+const paymentPlanRef = useRef(null);
+const paymentPlanId = useId();
+
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     // Buyer Information
-    firstName: session?.user?.name?.split(' ')[0] || '',
-    lastName: session?.user?.name?.split(' ')[1] || '',
+    firstName: session?.user?.firstName?.split(' ')[0] || '',
+    lastName: session?.user?.lastName?.split(' ')[0] || '',
     email: session?.user?.email || '',
     phone: '',
-    address: '',
+    nationalId: '',
+    kraPin : '',
     city: '',
     state: '',
-    zipCode: '',
+    postalCode: '',
     
     // Financial Information
     annualIncome: '',
@@ -62,9 +66,13 @@ export default function UnitPurchasePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check authentication
-  if (!session?.user) {
-    router.push('/login');
-    return null;
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
   }
 
 const unit = useMemo(() => {
@@ -138,15 +146,14 @@ if (isLoading) {
         if (!formData.lastName) newErrors.lastName = 'Last name is required';
         if (!formData.email) newErrors.email = 'Email is required';
         if (!formData.phone) newErrors.phone = 'Phone number is required';
-        if (!formData.address) newErrors.address = 'Address is required';
+        if (!formData.nationalId) newErrors.nationalId = 'National ID is required';
+        if (!formData.kraPin) newErrors.kraPin = 'KRA PIN is required';
         if (!formData.city) newErrors.city = 'City is required';
         if (!formData.state) newErrors.state = 'State is required';
-        if (!formData.zipCode) newErrors.zipCode = 'ZIP code is required';
+        if (!formData.postalCode) newErrors.postalCode = 'ZIP code is required';
         break;
         
       case 2: // Financial Information
-        if (!formData.annualIncome) newErrors.annualIncome = 'Annual income is required';
-        if (!formData.employmentStatus) newErrors.employmentStatus = 'Employment status is required';
         if (!formData.downPayment) newErrors.downPayment = 'Down payment amount is required';
         break;
         
@@ -184,6 +191,25 @@ if (isLoading) {
     setIsSubmitting(true);
     
     try {
+      const response = await fetch('/api/buyers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phone,
+        nationalId: formData.nationalId,
+        kraPin: formData.kraPin,
+        city: formData.city,
+        state: formData.state,
+        user:{id:session?.user?.id},
+        postalCode: formData.postalCode,
+      }),
+    });
+      const buyer = await response.json();
+
+
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 2000));
       
@@ -288,7 +314,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="firstName"
                         value={formData.firstName}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.firstName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your first name"
@@ -307,7 +333,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="lastName"
                         value={formData.lastName}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.lastName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your last name"
@@ -326,7 +352,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.email ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your email"
@@ -345,7 +371,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="phone"
                         value={formData.phone}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.phone ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="(555) 123-4567"
@@ -358,20 +384,38 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                   
                   <div className="mt-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Address *
+                      National ID Number*
                     </label>
                     <input
                       type="text"
-                      name="address"
-                      value={formData.address}
+                      name="nationalId"
+                      value={formData.nationalId}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.address ? 'border-red-500' : 'border-gray-300'
+                      className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.nationalId ? 'border-red-500' : 'border-gray-300'
                       }`}
-                      placeholder="Enter your street address"
+                      placeholder="Enter your national ID number"
                     />
-                    {errors.address && (
-                      <p className="mt-1 text-sm text-red-600">{errors.address}</p>
+                    {errors.nationalId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.nationalId}</p>
+                    )}
+                  </div>
+                                    <div className="mt-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      KRA Pin Number*
+                    </label>
+                    <input
+                      type="text"
+                      name="kraPin"
+                      value={formData.kraPin}
+                      onChange={handleInputChange}
+                      className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.kraPin ? 'border-red-500' : 'border-gray-300'
+                      }`}
+                      placeholder="Enter your kra pin number"
+                    />
+                    {errors.nationalId && (
+                      <p className="mt-1 text-sm text-red-600">{errors.kraPin}</p>
                     )}
                   </div>
                   
@@ -385,7 +429,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="city"
                         value={formData.city}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.city ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="City"
@@ -403,7 +447,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         name="state"
                         value={formData.state}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.state ? 'border-red-500' : 'border-gray-300'
                         }`}
                       >
@@ -421,20 +465,20 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                     
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        ZIP Code *
+                        Postal Code *
                       </label>
                       <input
                         type="text"
-                        name="zipCode"
-                        value={formData.zipCode}
+                        name="postalCode"
+                        value={formData.postalCode}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.zipCode ? 'border-red-500' : 'border-gray-300'
+                        className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.postalCode ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="12345"
                       />
-                      {errors.zipCode && (
-                        <p className="mt-1 text-sm text-red-600">{errors.zipCode}</p>
+                      {errors.postalCode && (
+                        <p className="mt-1 text-sm text-red-600">{errors.postalCode}</p>
                       )}
                     </div>
                   </div>
@@ -446,63 +490,6 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-6">Financial Information</h2>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Annual Income *
-                      </label>
-                      <input
-                        type="number"
-                        name="annualIncome"
-                        value={formData.annualIncome}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.annualIncome ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                        placeholder="100000"
-                      />
-                      {errors.annualIncome && (
-                        <p className="mt-1 text-sm text-red-600">{errors.annualIncome}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Employment Status *
-                      </label>
-                      <select
-                        name="employmentStatus"
-                        value={formData.employmentStatus}
-                        onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.employmentStatus ? 'border-red-500' : 'border-gray-300'
-                        }`}
-                      >
-                        <option value="">Select Status</option>
-                        <option value="employed">Employed</option>
-                        <option value="self_employed">Self Employed</option>
-                        <option value="retired">Retired</option>
-                        <option value="unemployed">Unemployed</option>
-                      </select>
-                      {errors.employmentStatus && (
-                        <p className="mt-1 text-sm text-red-600">{errors.employmentStatus}</p>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Employer (if applicable)
-                    </label>
-                    <input
-                      type="text"
-                      name="employer"
-                      value={formData.employer}
-                      onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Company name"
-                    />
-                  </div>
                   
                   <div className="mt-6">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -516,10 +503,10 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                           value="cash"
                           checked={formData.financingType === 'cash'}
                           onChange={handleInputChange}
-                          className="mr-3"
+                          className=" mr-3"
                         />
                         <div>
-                          <div className="font-medium">Cash Purchase</div>
+                          <div className=" text-gray-800  font-medium">Cash Purchase</div>
                           <div className="text-sm text-gray-500">Full payment upfront</div>
                         </div>
                       </label>
@@ -528,14 +515,14 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         <input
                           type="radio"
                           name="financingType"
-                          value="mortgage"
-                          checked={formData.financingType === 'mortgage'}
+                          value="monthlyPayments"
+                          checked={formData.financingType === 'monthlyPayments'}
                           onChange={handleInputChange}
                           className="mr-3"
                         />
                         <div>
-                          <div className="font-medium">Mortgage</div>
-                          <div className="text-sm text-gray-500">Traditional financing</div>
+                          <div className="text-gray-800 font-medium">Monthly Payments</div>
+                          <div className="text-sm text-gray-500">Pay each month with a payment plan</div>
                         </div>
                       </label>
                       
@@ -543,13 +530,13 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                         <input
                           type="radio"
                           name="financingType"
-                          value="financing"
-                          checked={formData.financingType === 'financing'}
+                          value="payAsYouGO"
+                          checked={formData.financingType === 'payAsYouGO'}
                           onChange={handleInputChange}
                           className="mr-3"
                         />
                         <div>
-                          <div className="font-medium">Developer Financing</div>
+                          <div className="text-gray-700 font-medium">Pay As You GO</div>
                           <div className="text-sm text-gray-500">Flexible terms</div>
                         </div>
                       </label>
@@ -565,7 +552,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                       name="downPayment"
                       value={formData.downPayment}
                       onChange={handleInputChange}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      className={`text-gray-800 placeholder-gray-400 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.downPayment ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder="50000"
@@ -749,8 +736,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                           <p>{formData.firstName} {formData.lastName}</p>
                           <p>{formData.email}</p>
                           <p>{formData.phone}</p>
-                          <p>{formData.address}</p>
-                          <p>{formData.city}, {formData.state} {formData.zipCode}</p>
+                          <p>{formData.city}, {formData.state} {formData.postalCode}</p>
                         </div>
                       </div>
                     </div>
@@ -905,21 +891,21 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                   <div className="text-sm text-gray-600">{project.name}</div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="text-gray-600 grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-gray-600">Bedrooms:</span>
+                    <span className="text-gray-800">Bedrooms:</span>
                     <div className="font-medium">{unit.bedrooms}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Bathrooms:</span>
+                    <span className="text-gray-800">Bathrooms:</span>
                     <div className="font-medium">{unit.bathrooms}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Square Feet:</span>
+                    <span className="text-gray-800">Square Feet:</span>
                     <div className="font-medium">{unit.sqft?.toLocaleString()}</div>
                   </div>
                   <div>
-                    <span className="text-gray-600">Floor:</span>
+                    <span className="text-gray-800">Floor:</span>
                     <div className="font-medium">{unit.floor}</div>
                   </div>
                 </div>
@@ -939,16 +925,16 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
               
               <div className="space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Base Price:</span>
-                  <span className="font-medium">{formatPrice(unit.price)}</span>
+                  <span className="text-gray-800">Base Price:</span>
+                  <span className="text-gray-600 italic font-medium">{formatPrice(unit.price)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Est. Taxes (8%):</span>
-                  <span className="font-medium">{formatPrice(taxAmount)}</span>
+                  <span className="text-gray-600 ">Est. Taxes (8%):</span>
+                  <span className="text-gray-600 italic font-medium">{formatPrice(taxAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Processing Fee:</span>
-                  <span className="font-medium">$500</span>
+                  <span className="text-gray-600 italic font-medium">{formatPrice(500)}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between">
                   <span className="font-semibold text-gray-900">Total:</span>
@@ -964,7 +950,7 @@ const totalAmount = unit?.price ? unit.price + taxAmount : 0;
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Financing Needed:</span>
-                        <span className="font-medium">{formatPrice(totalAmount + 500 - downPaymentAmount)}</span>
+                        <span className="text-gray-600 font-medium">{formatPrice(totalAmount + 500 - downPaymentAmount)}</span>
                       </div>
                     </div>
                   </>

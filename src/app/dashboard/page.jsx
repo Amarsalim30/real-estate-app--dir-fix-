@@ -539,7 +539,7 @@ const recentActivity = useMemo(() => {
                       description="Manage your account info"
                       icon={Settings}
                       color="text-gray-600"
-                      onClick={() => setActiveTab('profile')}
+                      onClick={() => router.push('/dashboard/profile')}
                     />
                     <QuickActionCard
                       title="Get Support"
@@ -932,7 +932,7 @@ const recentActivity = useMemo(() => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">ZIP Code</label>
-                  <p className="text-gray-900">{buyer.zipCode}</p>
+                  <p className="text-gray-900">{buyer.postalCode}</p>
                 </div>
 
                 <div>
