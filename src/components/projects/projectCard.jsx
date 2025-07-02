@@ -21,11 +21,13 @@ export default function ProjectCard({ project }) {
   const router = useRouter();
   const [imageError, setImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
-    const { units } = useUnits();
+  const { units } = useUnits();
 
+  // Calculate project statistics - Fixed to handle no units case
+  const projectUnits = units.length > 0
+    ? units.filter(unit => unit.projectId === project.id)
+    : [];
 
-  // Calculate project statistics
-  const projectUnits = units.filter(unit => unit.projectId === project.id);
   const soldUnits = projectUnits.filter(unit => unit.status === 'sold').length;
   const reservedUnits = projectUnits.filter(unit => unit.status === 'reserved').length;
   const availableUnits = projectUnits.filter(unit => unit.status === 'available').length;
@@ -33,8 +35,10 @@ export default function ProjectCard({ project }) {
   
   const salesProgress = totalUnits > 0 ? ((soldUnits + reservedUnits) / totalUnits * 100) : 0;
   
-  // Price range
-  const prices = projectUnits.map(unit => unit.price).filter(price => price > 0);
+  // Price range - Fixed to handle empty projectUnits
+  const prices = projectUnits.length > 0 
+    ? projectUnits.map(unit => unit.price).filter(price => price > 0)
+    : [];
   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
 
@@ -186,7 +190,7 @@ export default function ProjectCard({ project }) {
           </div>
         </div>
 
-        {/* Statistics */}
+        {/* Statistics - Enhanced to show "No units" state */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="text-center">
             <div className="flex items-center justify-center mb-1">
@@ -211,28 +215,42 @@ export default function ProjectCard({ project }) {
           </div>
         </div>
 
-        {/* Sales Progress Bar */}
+        {/* Sales Progress Bar - Enhanced for no units case */}
         <div className="mb-4">
           <div className="flex items-center justify-between text-sm mb-2">
-            <span className="text-gray-600">Sales Progress</span>
-            <span className="font-medium text-gray-900">{soldUnits + reservedUnits}/{totalUnits}</span>
+            <span className="text-gray-600">
+              {totalUnits === 0 ? 'No Units Available' : 'Sales Progress'}
+            </span>
+            <span className="font-medium text-gray-900">
+              {totalUnits === 0 ? '-' : `${soldUnits + reservedUnits}/${totalUnits}`}
+            </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
-            <div className="flex h-2 rounded-full overflow-hidden">
-              <div 
-                className="bg-green-500 transition-all duration-300"
-                style={{ width: `${totalUnits > 0 ? (soldUnits / totalUnits * 100) : 0}%` }}
-              />
-              <div 
-                className="bg-yellow-500 transition-all duration-300"
-                style={{ width: `${totalUnits > 0 ? (reservedUnits / totalUnits * 100) : 0}%` }}
-              />
-            </div>
+            {totalUnits === 0 ? (
+              <div className="h-2 bg-gray-300 rounded-full" />
+            ) : (
+              <div className="flex h-2 rounded-full overflow-hidden">
+                <div 
+                  className="bg-green-500 transition-all duration-300"
+                  style={{ width: `${(soldUnits / totalUnits * 100)}%` }}
+                />
+                <div 
+                  className="bg-yellow-500 transition-all duration-300"
+                  style={{ width: `${(reservedUnits / totalUnits * 100)}%` }}
+                />
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
-            <span>Sold: {soldUnits}</span>
-            <span>Reserved: {reservedUnits}</span>
-            <span>Available: {availableUnits}</span>
+            {totalUnits === 0 ? (
+              <span className="text-center w-full">Units coming soon</span>
+            ) : (
+              <>
+                <span>Sold: {soldUnits}</span>
+                <span>Reserved: {reservedUnits}</span>
+                <span>Available: {availableUnits}</span>
+              </>
+            )}
           </div>
         </div>
 

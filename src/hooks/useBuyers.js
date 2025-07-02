@@ -80,3 +80,26 @@ export const useBuyer = (id) => {
 
   return { buyer, loading, error, refetch };
 };
+export const useCreateBuyer = (buyerData) => {
+  const [buyer, setBuyer] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (!buyerData) return;
+
+    const createBuyer = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await buyersApi.create(buyerData);
+        setBuyer(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+  }, []);
+
+};

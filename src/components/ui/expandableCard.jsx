@@ -1,18 +1,16 @@
 'use client';
-// Add this import to your main page.jsx file
 import React, { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { useOutsideClick } from "@/hooks/use-outside-click"; // You'll need this hook
 import { 
-  CreditCard, 
   Calendar, 
   DollarSign,
   CheckCircle,
   Clock,
-  TrendingUp
+  TrendingUp,
+  AlertCircle
 } from 'lucide-react';
 
-// Simple useOutsideClick hook implementation if you don't have it
+// Simple useOutsideClick hook implementation
 const useOutsideClick = (ref, callback) => {
   useEffect(() => {
     const handleClick = (event) => {
@@ -26,15 +24,112 @@ const useOutsideClick = (ref, callback) => {
 };
 
 // Enhanced Step 2 Component with Expandable Payment Plans
-export function PaymentPlanCard({ formData, handleInputChange, formatPrice, totalAmount, errors }) {
+export function PaymentPlanCard({ 
+  formData, 
+  handleInputChange, 
+  formatPrice, 
+  totalAmount, 
+  errors,
+  paymentPlansData = [], // Accept API data as prop
+  plansLoading = false,
+  plansError = null
+}) {
   const [activePaymentPlan, setActivePaymentPlan] = useState(null);
   const ref = useRef(null);
   const id = useId();
 
-  // Payment plan calculations
+  
+  // Payment plan calculations using API data
   const calculatePaymentPlans = () => {
+    if (!paymentPlansData || paymentPlansData.length === 0) {
+      return getDefaultPaymentPlans();
+    }
+
     const principal = totalAmount;
-    const downPaymentPercentage = 0.1; // 10% minimum
+
+    return paymentPlansData
+      .filter(plan => plan.active)
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+      .map((plan, index) => {
+        const minDownPayment = principal * (plan.minDownPaymentPercentage || 0.1);
+        const isCash = plan.planType === 'cash';
+        const isFlexible = plan.isFlexible;
+        
+        // Calculate monthly installment
+        let monthlyInstallment = 0;
+        let totalInterest = 0;
+        
+        if (!isCash && !isFlexible && plan.periodMonths > 0) {
+          const principalAfterDown = principal - minDownPayment;
+          totalInterest = principalAfterDown * (plan.interestRate || 0);
+          monthlyInstallment = Math.round((principalAfterDown + totalInterest) / plan.periodMonths);
+        }
+
+        // Map plan type to icon and colors
+        const getIconAndColors = (planType) => {
+          switch (planType) {
+            case 'cash':
+              return {
+                icon: <DollarSign className="w-6 h-6" />,
+                bgColor: 'bg-green-50',
+                borderColor: 'border-green-200',
+                iconColor: 'text-green-600'
+              };
+            case 'installment':
+              if ((plan.periodMonths || 0) <= 12) {
+                return {
+                  icon: <Calendar className="w-6 h-6" />,
+                  bgColor: 'bg-blue-50',
+                  borderColor: 'border-blue-200',
+                  iconColor: 'text-blue-600'
+                };
+              } else {
+                return {
+                  icon: <Clock className="w-6 h-6" />,
+                  bgColor: 'bg-purple-50',
+                  borderColor: 'border-purple-200',
+                  iconColor: 'text-purple-600'
+                };
+              }
+            case 'flexible':
+            default:
+              return {
+                icon: <TrendingUp className="w-6 h-6" />,
+                bgColor: 'bg-orange-50',
+                borderColor: 'border-orange-200',
+                iconColor: 'text-orange-600'
+              };
+          }
+        };
+
+        const iconAndColors = getIconAndColors(plan.planType);
+
+        return {
+          id: plan.id?.toString() || `plan-${index}`,
+          title: plan.name,
+          description: plan.description,
+          ...iconAndColors,
+          ctaText: 'Select Plan',
+          planData: plan,
+          details: {
+            principalAmount: principal,
+            downPayment: isCash ? principal : minDownPayment,
+            paymentPeriod: isFlexible ? 'Flexible' : (isCash ? 0 : plan.periodMonths),
+            monthlyInstallment: isFlexible ? 'Variable' : (isCash ? 0 : monthlyInstallment),
+            totalInterest: Math.round(totalInterest),
+            benefits: Array.isArray(plan.benefits) ? plan.benefits : ['Contact us for details'],
+            processingFee: principal * (plan.processingFeePercentage || 0),
+            earlyPaymentDiscount: plan.earlyPaymentDiscount || 0,
+            termsAndConditions: plan.termsAndConditions
+          }
+        };
+      });
+  };
+
+  // Fallback function for default plans
+  const getDefaultPaymentPlans = () => {
+    const principal = totalAmount;
+    const downPaymentPercentage = 0.1;
     const minDownPayment = principal * downPaymentPercentage;
 
     return [
@@ -69,45 +164,9 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
           principalAmount: principal,
           downPayment: minDownPayment,
           paymentPeriod: 12,
-          monthlyInstallment: (principal - minDownPayment) / 12,
+          monthlyInstallment: Math.round((principal - minDownPayment) / 12),
           totalInterest: 0,
           benefits: ['0% interest for 12 months', 'Low monthly payments', 'Quick ownership']
-        }
-      },
-      {
-        id: 'monthly24',
-        title: '24 Month Plan',
-        description: 'Extended payment period',
-        icon: <Clock className="w-6 h-6" />,
-        bgColor: 'bg-purple-50',
-        borderColor: 'border-purple-200',
-        iconColor: 'text-purple-600',
-        ctaText: 'Select Plan',
-        details: {
-          principalAmount: principal,
-          downPayment: minDownPayment,
-          paymentPeriod: 24,
-          monthlyInstallment: (principal - minDownPayment) * 1.05 / 24, // 5% total interest
-          totalInterest: (principal - minDownPayment) * 0.05,
-          benefits: ['Lower monthly payments', 'Flexible terms', 'Budget-friendly']
-        }
-      },
-      {
-        id: 'payAsYouGo',
-        title: 'Pay As You GO',
-        description: 'Flexible payment terms',
-        icon: <TrendingUp className="w-6 h-6" />,
-        bgColor: 'bg-orange-50',
-        borderColor: 'border-orange-200',
-        iconColor: 'text-orange-600',
-        ctaText: 'Select Plan',
-        details: {
-          principalAmount: principal,
-          downPayment: minDownPayment,
-          paymentPeriod: 'Flexible',
-          monthlyInstallment: 'Variable',
-          totalInterest: 'Negotiable',
-          benefits: ['Customizable payment schedule', 'Negotiate terms', 'Perfect for investors']
         }
       }
     ];
@@ -137,7 +196,7 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
   const handlePlanSelect = (planId) => {
     handleInputChange({
       target: {
-        name: 'financingType',
+        name: 'paymentPlanId',
         value: planId,
         type: 'radio'
       }
@@ -176,6 +235,22 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
         <label className="block text-sm font-medium text-gray-700 mb-4">
           Choose Your Payment Plan
         </label>
+        
+        {plansLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-gray-600">Loading payment plans...</span>
+          </div>
+        ) : plansError ? (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <div className="flex items-center">
+              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+              <p className="text-sm text-yellow-800">
+                Unable to load payment plans from server. Using default options.
+              </p>
+            </div>
+          </div>
+        ) : null}
         
         {/* Expandable Cards Modal */}
         <AnimatePresence>
@@ -258,6 +333,14 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
                               {formatPrice(activePaymentPlan.details.downPayment)}
                             </span>
                           </div>
+                          {activePaymentPlan.details.processingFee > 0 && (
+                            <div className="flex justify-between py-2 border-b border-gray-200">
+                              <span className="text-gray-600">Processing Fee:</span>
+                              <span className="font-semibold text-orange-600">
+                                {formatPrice(activePaymentPlan.details.processingFee)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-3">
                           <div className="flex justify-between py-2 border-b border-gray-200">
@@ -267,7 +350,8 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
                                 ? 'One-time' 
                                 : activePaymentPlan.details.paymentPeriod === 'Flexible'
                                 ? 'Flexible'
-                                : `${activePaymentPlan.details.paymentPeriod} months`}
+                                : `${activePaymentPlan.
+details.paymentPeriod} months`}
                             </span>
                           </div>
                           <div className="flex justify-between py-2 border-b border-gray-200">
@@ -280,6 +364,14 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
                                 : formatPrice(activePaymentPlan.details.monthlyInstallment)}
                             </span>
                           </div>
+                          {activePaymentPlan.details.earlyPaymentDiscount > 0 && (
+                            <div className="flex justify-between py-2 border-b border-gray-200">
+                              <span className="text-gray-600">Early Payment Discount:</span>
+                              <span className="font-semibold text-green-600">
+                                {(activePaymentPlan.details.earlyPaymentDiscount * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
                       
@@ -307,6 +399,18 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
                         ))}
                       </ul>
                     </div>
+
+                    {/* Terms and Conditions */}
+                    {activePaymentPlan.details.termsAndConditions && (
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 mb-3">Terms & Conditions</h4>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <p className="text-sm text-blue-800">
+                            {activePaymentPlan.details.termsAndConditions}
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Action Buttons */}
                     <div className="flex space-x-4 pt-4">
@@ -339,7 +443,7 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
               key={`card-${plan.title}-${id}`}
               onClick={() => setActivePaymentPlan(plan)}
               className={`p-6 border-2 rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                formData.financingType === plan.id 
+                formData.paymentPlanId === plan.id 
                   ? `${plan.borderColor} ${plan.bgColor}` 
                   : 'border-gray-200 hover:border-gray-300'
               }`}
@@ -367,14 +471,14 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {formData.financingType === plan.id && (
+                  {formData.paymentPlanId === plan.id && (
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   )}
                   <input
                     type="radio"
-                    name="financingType"
+                    name="paymentPlanId"
                     value={plan.id}
-                    checked={formData.financingType === plan.id}
+                    checked={formData.paymentPlanId === plan.id}
                     onChange={handleInputChange}
                     className="sr-only"
                   />
@@ -393,7 +497,7 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
       </div>
 
       {/* Down Payment Input */}
-      <div className="mt-6">
+      {/* <div className="mt-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Down Payment Amount *
         </label>
@@ -413,7 +517,7 @@ export function PaymentPlanCard({ formData, handleInputChange, formatPrice, tota
         <p className="mt-1 text-sm text-gray-500">
           Minimum 10% ({formatPrice(totalAmount * 0.1)}) required
         </p>
-      </div>
+      </div> */}
     </div>
   );
 }
