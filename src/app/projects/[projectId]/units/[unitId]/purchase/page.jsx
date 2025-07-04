@@ -136,10 +136,10 @@ export default function UnitPurchasePage() {
     return paymentPlansData.find(p => p.id === formData.paymentPlanId);
   }, [formData.paymentPlanId, paymentPlansData]);
 
-  const downPaymentAmount = 1; //useMemo(() => {
-  //   if (!selectedPlan || !totalAmount) return 0;
-  //   return totalAmount * (selectedPlan.minDownPaymentPercentage || 0.001);
-  // }, [selectedPlan, totalAmount]);
+const downPaymentAmount = useMemo(() => {
+  if (!selectedPlan || !totalAmount) return totalAmount * 0.1; // Default 10%
+  return totalAmount * (selectedPlan.minDownPaymentPercentage || 0.1);
+}, [selectedPlan, totalAmount]);
 
   const financingAmount = totalAmount - downPaymentAmount;
   const processingFee = selectedPlan?.details?.processingFee || 500;
@@ -317,7 +317,7 @@ const handleSubmit = async () => {
     const purchase = response.data;
     console.log('Purchase submitted successfully:', purchase);
 
-    router.push(`/projects/${project.id}/units/${unit.id}/purchase/success`);
+    router.push(`/projects/${project.id}/units/${unit.id}/purchase/purchaseSuccess`);
   } catch (error) {
     console.error('Purchase submission failed:', error);
     setErrors({

@@ -1,13 +1,17 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Buyers } from '@/data/buyers';
+// import { Buyers } from '@/data/buyers';
+import { useBuyers } from '@/hooks';
 import { formatPrice } from '@/lib/format';
 import UnitStatusBadge from './UnitStatusBadge';
 
 export default function UnitCard({ unit, project, showActions = false, onReserve, onSell }) {
   const router = useRouter();
-  const [imageError, setImageError] = useState(false);
+  const { buyers:Buyers, loading: buyersLoading, error: buyersError } = useBuyers();
+    const [imageError, setImageError] = useState(false);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
 
   const handleCardClick = () => {
     router.push(`/projects/${project.id}/units/${unit.id}`);
@@ -37,10 +41,12 @@ export default function UnitCard({ unit, project, showActions = false, onReserve
       <div 
         className="aspect-w-16 aspect-h-9 bg-gray-200 cursor-pointer"
         onClick={handleCardClick}
-      >
+      >{console.log(`${apiBaseUrl}/images/${unit.images[0]}`)}
+
         {unit.images && unit.images.length > 0 && !imageError ? (
+          
           <img
-            src={unit.images[0]}
+            src={`${apiBaseUrl}/images/${unit.images[0]}`}
             alt={`Unit ${unit.unitNumber}`}
             className="w-full h-32 object-cover"
             onError={() => setImageError(true)}

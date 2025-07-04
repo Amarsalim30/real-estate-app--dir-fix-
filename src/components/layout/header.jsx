@@ -9,6 +9,8 @@ export default function Header({}) {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: session, status } = useSession();
 
+    if (!session) return null; // Optionally show nothing if not logged in
+
 
   return (
     // {/* Header */}

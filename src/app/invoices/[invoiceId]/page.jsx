@@ -3,11 +3,18 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Invoices, InvoiceStatuses } from '@/data/invoices';
-import { Buyers } from '@/data/buyers';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
-import { Payments } from '@/data/payments';
+import { InvoiceStatuses } from '@/data/invoices';
+// import { Buyers } from '@/data/buyers';
+// import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
+// import { Payments } from '@/data/payments';
+
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
@@ -93,9 +100,21 @@ const CopyButton = ({ text, label }) => {
 
 function InvoiceDetailContent() {
   const { data: session } = useSession();
+  const {buyers: Buyers } = useBuyers();
+const {units: Units } = useUnits();
+const {projects: Projects } = useProjects();
+const {invoices: Invoices } = useInvoices();
+const {payments: Payments } = usePayments();
+
   const params = useParams();
   const router = useRouter();
-  const invoiceId = parseInt(params.invoiceId);
+  var invoiceId='';
+
+  useEffect(() => {
+  if (!invoiceId || isNaN(invoiceId)) return;
+  invoiceId = parseInt(params.invoiceId);
+
+  }, [params.invoiceId, session]);
 
   const [invoice, setInvoice] = useState(null);
   const [buyer, setBuyer] = useState(null);
@@ -112,16 +131,21 @@ function InvoiceDetailContent() {
       return session.user.buyerId;
     }
     
-    const buyer = Buyers.find(b => b.email === session?.user?.email);
+    const buyer = Buyers?.find(b => b.email === session?.user?.email);
     return buyer?.id || null;
   };
 
   const userBuyerId = getUserBuyerId();
 
-  useEffect(() => {
+useEffect(() => {
     const fetchInvoiceData = () => {
       try {
-        const foundInvoice = Invoices?.find(i => i.id === invoiceId);
+        // Only proceed if all necessary data is available
+        if (!Invoices || !Buyers || !Units || !Projects || !Payments) {
+          return; // Still waiting for data to load
+        }
+
+        const foundInvoice = Invoices.find(i => i.id === invoiceId);
         
         if (!foundInvoice) {
           setLoading(false);
@@ -137,19 +161,17 @@ function InvoiceDetailContent() {
         setInvoice(foundInvoice);
 
         // Get related data
-        const foundBuyer = Buyers?.find(b => b.id === foundInvoice.buyerId);
+        const foundBuyer = Buyers.find(b => b.id === foundInvoice.buyerId);
         setBuyer(foundBuyer);
 
-        const foundUnit = Units?.find(u => u.id === foundInvoice.unitId);
+        const foundProject = Projects.find(p => p.id === foundInvoice.projectId);
+        setProject(foundProject);
+      
+        const foundUnit = Units.find(u => u.id === foundInvoice.unitId);
         setUnit(foundUnit);
 
-        if (foundUnit) {
-          const foundProject = Projects?.find(p => p.id === foundInvoice.projectId);
-          setProject(foundProject);
-        }
-
         // Get related payments
-        const payments = Payments?.filter(p => p.invoiceId === foundInvoice.id) || [];
+        const payments = Payments.filter(p => p.invoiceId === foundInvoice.id) || [];
         setRelatedPayments(payments);
 
         setLoading(false);
@@ -160,7 +182,7 @@ function InvoiceDetailContent() {
     };
 
     fetchInvoiceData();
-  }, [invoiceId, isAdmin, userBuyerId]);
+  }, [invoiceId, isAdmin, userBuyerId, Invoices, Buyers, Units, Projects, Payments]); // Added data dependencies
 
   const handleEdit = () => {
     router.push(`/invoices/${invoiceId}/edit`);
@@ -178,7 +200,7 @@ function InvoiceDetailContent() {
   };
 
   const handleDownloadPDF = () => {
-    console.log('Download PDF for invoice:', invoice);
+  alert("Download feature coming soon!");
   };
 
   const handlePayNow = () => {
@@ -238,7 +260,8 @@ function InvoiceDetailContent() {
             <h1 className="text-3xl font-bold text-gray-900">
               {isAdmin ? 'Invoice Details' : 'Your Invoice'}
             </h1>
-            <p className="text-gray-600">Invoice #{invoice.invoiceNumber}</p>
+            {console.log("invoice.invoiceNumber:", invoice)}
+            <p className="text-gray-600">Invoice #{invoice.id}</p>
           </div>
         </div>
 
@@ -316,8 +339,8 @@ function InvoiceDetailContent() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Invoice Number</label>
                 <div className="flex items-center">
-                  <p className="text-lg font-semibold text-gray-900">{invoice.invoiceNumber}</p>
-                  <CopyButton text={invoice.invoiceNumber} label="invoice number" />
+                  <p className="text-lg font-semibold text-gray-900">{invoice.id}</p>
+                  <CopyButton text={invoice.id} label="invoice number" />
                 </div>
               </div>
 
@@ -330,7 +353,7 @@ function InvoiceDetailContent() {
                 <label className="block text-sm font-medium text-gray-600 mb-1">Issue Date</label>
                 <div className="flex items-center text-gray-900">
                   <Calendar className="w-4 h-4 mr-2" />
-                  {new Date(invoice.issueDate).toLocaleDateString('en-US', {
+                  {new Date(invoice.issuedDate).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric'
@@ -462,7 +485,7 @@ function InvoiceDetailContent() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium text-gray-900">{formatPrice(invoice.subtotal)}</span>
+              <span className="font-medium text-gray-900">{formatPrice(invoice.totalAmount)}</span>
             </div>
             
             <div className="flex justify-between items-center">

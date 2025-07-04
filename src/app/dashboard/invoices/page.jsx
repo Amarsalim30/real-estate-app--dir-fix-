@@ -2,13 +2,20 @@
 import { useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Invoices } from '@/data/invoices';
-import { Buyers } from '@/data/buyers';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
+// import { Buyers } from '@/data/buyers';
+// import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
+import { toast } from 'sonner'; 
+import { useInvoices } from '@/hooks/useInvoices'; 
+import { invoicesApi } from '@/lib/api/invoices';
+import { useBuyers } from '@/hooks/useBuyers'; // Add this
+import { useUnits } from '@/hooks/useUnits'; // Add this
+import { useProjects } from '@/hooks/useProjects'; // Add this
+
+
 import { 
   FileText, 
   Search, 
@@ -53,11 +60,10 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const InvoiceCard = ({ invoice, onView, onEdit, onDelete, onSend, onPrint }) => {
-  const buyer = Buyers?.find(b => b.id === invoice.buyerId);
-  const unit = Units?.find(u => u.id === invoice.unitId);
-  const project = Projects?.find(p => p.id === unit?.projectId);
-
+function InvoiceCard({ invoice, onEdit, onDelete, onSend, onPrint, buyers, units, projects }) {
+  const buyer = buyers?.find(b => b.id === invoice.buyerId);
+  const unit = units?.find(u => u.id === invoice.unitId);
+  const project = projects?.find(p => p.id === unit?.projectId);
   const isOverdue = invoice.status === 'pending' && new Date(invoice.dueDate) < new Date();
   const actualStatus = isOverdue ? 'overdue' : invoice.status;
 
@@ -265,66 +271,87 @@ function InvoicesContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
+  // Fetch all data using hooks
+  const { invoices, loading: invoicesLoading, error: invoicesError, refetch } = useInvoices();
+  const { buyers, loading: buyersLoading, error: buyersError } = useBuyers();
+  const { units, loading: unitsLoading, error: unitsError } = useUnits();
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+
   const isAdmin = session?.user?.role === ROLES.ADMIN;
   const isCashier = session?.user?.role === ROLES.CASHIER || isAdmin;
 
-  // Filter and sort invoices
-  const filteredInvoices = useMemo(() => {
-    let filtered = Invoices || [];
+// Filter and sort invoices
+const filteredInvoices = useMemo(() => {
+  let filtered = invoices || [];
 
-    // Search filter
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(invoice => {
-        const buyer = Buyers?.find(b => b.id === invoice.buyerId);
-        const unit = Units?.find(u => u.id === invoice.unitId);
-        const project = Projects?.find(p => p.id === unit?.projectId);
-        
-        return (
-          invoice.invoiceNumber.toLowerCase().includes(term) ||
-          `${buyer?.firstName} ${buyer?.lastName}`.toLowerCase().includes(term) ||
-          buyer?.email?.toLowerCase().includes(term) ||
-          unit?.unitNumber?.toLowerCase().includes(term) ||
-          project?.name?.toLowerCase().includes(term)
-        );
-      });
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      if (statusFilter === 'overdue') {
-        filtered = filtered.filter(invoice => 
-          invoice.status === 'pending' && new Date(invoice.dueDate) < new Date()
-        );
-      } else {
-        filtered = filtered.filter(invoice => invoice.status === statusFilter);
-      }
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      let aValue = a[sortBy];
-      let bValue = b[sortBy];
-
-      if (sortBy === 'dueDate' || sortBy === 'createdAt') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
-      }
-
-      if (sortBy === 'buyerName') {
-        const buyerA = Buyers?.find(buyer => buyer.id === a.buyerId);
-        const buyerB = Buyers?.find(buyer => buyer.id === b.buyerId);
-        aValue = `${buyerA?.firstName} ${buyerA?.lastName}`;
-        bValue = `${buyerB?.firstName} ${buyerB?.lastName}`;
-      }
-
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
+  // Search filter
+  if (searchTerm) {
+    const term = searchTerm.toLowerCase();
+    filtered = filtered.filter(invoice => {
+      const buyer = buyers?.find(b => b.id === invoice.buyerId); // Use buyers from hook
+      const unit = units?.find(u => u.id === invoice.unitId); // Use units from hook
+      const project = projects?.find(p => p.id === unit?.projectId); // Use projects from hook
+      
+      return (
+        invoice.invoiceNumber.toLowerCase().includes(term) ||
+        `${buyer?.firstName} ${buyer?.lastName}`.toLowerCase().includes(term) ||
+        buyer?.email?.toLowerCase().includes(term) ||
+        unit?.unitNumber?.toLowerCase().includes(term) ||
+        project?.name?.toLowerCase().includes(term)
+      );
     });
+  }
 
-    return filtered;
-  }, [searchTerm, statusFilter, sortBy, sortOrder]);
+  // Status filter
+  if (statusFilter !== 'all') {
+    if (statusFilter === 'overdue') {
+      filtered = filtered.filter(invoice => 
+        invoice.status === 'pending' && new Date(invoice.dueDate) < new Date()
+      );
+    } else {
+      filtered = filtered.filter(invoice => invoice.status === statusFilter);
+    }
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    let aValue = a[sortBy];
+    let bValue = b[sortBy];
+    
+    if (sortBy === 'buyerName') {
+      const buyerA = buyers?.find(buyer => buyer.id === a.buyerId);
+      const buyerB = buyers?.find(buyer => buyer.id === b.buyerId);
+      aValue = `${buyerA?.firstName} ${buyerA?.lastName}`;
+      bValue = `${buyerB?.firstName} ${buyerB?.lastName}`;
+    } else if (sortBy === 'unitNumber') {
+      const unitA = units?.find(unit => unit.id === a.unitId);
+      const unitB = units?.find(unit => unit.id === b.unitId);
+      aValue = unitA?.unitNumber;
+      bValue = unitB?.unitNumber;
+    } else if (sortBy === 'projectName') {
+      const unitA = units?.find(unit => unit.id === a.unitId);
+      const unitB = units?.find(unit => unit.id === b.unitId);
+      const projectA = projects?.find(project => project.id === unitA?.projectId);
+      const projectB = projects?.find(project => project.id === unitB?.projectId);
+      aValue = projectA?.name;
+      bValue = projectB?.name;
+    }
+    
+    if (typeof aValue === 'string') {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+    
+    if (sortOrder === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
+  });
+
+  return filtered;
+}, [searchTerm, statusFilter, sortBy, sortOrder, invoices, buyers, units, projects]); // Add all dependencies
+
 
   // Pagination
   const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
@@ -346,32 +373,107 @@ function InvoicesContent() {
     window.open(`/invoices/${invoice.id}`, '_blank');
   };
 
-  const handleEdit = (invoice) => {
-    // Navigate to edit page or open edit modal
-    console.log('Edit invoice:', invoice);
-  };
+const handleEdit = async (invoice) => {
+  // Navigate to edit page or open edit modal
+  console.log('Edit invoice:', invoice);
+};
 
-  const handleDelete = (invoice) => {
-    if (confirm('Are you sure you want to delete this invoice?')) {
-      // Handle delete logic
-      console.log('Delete invoice:', invoice);
+const handleDelete = async (invoice) => {
+  if (confirm('Are you sure you want to delete this invoice?')) {
+    try {
+      await invoicesApi.delete(invoice.id);
+      toast.success('Invoice deleted successfully');
+      refetch(); // Refresh the list
+    } catch (error) {
+      toast.error('Failed to delete invoice');
+      console.error('Delete error:', error);
     }
-  };
+  }
+};
 
-  const handleSend = (invoice) => {
-    // Handle sending invoice
-    console.log('Send invoice:', invoice);
-  };
+const handleSend = async (invoice) => {
+  try {
+    await invoicesApi.sendReminder(invoice.id);
+    toast.success('Invoice sent successfully');
+    refetch(); // Refresh the list
+  } catch (error) {
+    toast.error('Failed to send invoice');
+    console.error('Send error:', error);
+  }
+};
 
-  const handlePrint = (invoice) => {
-    // Handle printing invoice
-    window.open(`/invoices/${invoice.id}/print`, '_blank');
-  };
+const handlePrint = async (invoice) => {
+  try {
+    const pdfBlob = await invoicesApi.getPdf(invoice.id);
+    const url = window.URL.createObjectURL(pdfBlob);
+    window.open(url, '_blank');
+  } catch (error) {
+    toast.error('Failed to generate PDF');
+    console.error('PDF error:', error);
+  }
+};
 
-  const handleBulkAction = (action) => {
-    // Handle bulk actions
-    console.log('Bulk action:', action);
-  };
+const handleBulkAction = async (action) => {
+  try {
+    switch (action) {
+      case 'export':
+        // Handle export logic
+        break;
+      case 'send-reminders':
+        // Handle bulk reminder sending
+        break;
+      case 'export-overdue':
+        const overdueInvoices = await invoicesApi.getOverdue();
+        // Handle overdue export
+        break;
+      default:
+        break;
+    }
+  } catch (error) {
+    toast.error(`Failed to ${action}`);
+    console.error('Bulk action error:', error);
+  }
+};
+// Check if any data is loading
+const isLoading = invoicesLoading || buyersLoading || unitsLoading || projectsLoading;
+
+// Check for any errors
+const hasError = invoicesError || buyersError || unitsError || projectsError;
+const errorMessage = invoicesError || buyersError || unitsError || projectsError;
+
+if (isLoading) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading invoices data...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+if (hasError) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-4">{errorMessage}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 
   return (
     <div className="p-6">
@@ -391,10 +493,14 @@ function InvoicesContent() {
             Export
           </button>
           
-          <button className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Refresh
-          </button>
+<button 
+  onClick={refetch} // Change from generic function to refetch
+  className="flex items-center px-4 py-2 text-gray-600 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+>
+  <RefreshCw className="w-4 h-4 mr-2" />
+  Refresh
+</button>
+
           
           {isCashier && (
             <Link
@@ -488,16 +594,18 @@ function InvoicesContent() {
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {paginatedInvoices.map((invoice) => (
-              <InvoiceCard
-                key={invoice.id}
-                invoice={invoice}
-                onView={handleView}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onSend={handleSend}
-                onPrint={handlePrint}
-              />
-            ))}
+    <InvoiceCard
+      key={invoice.id}
+      invoice={invoice}
+      onEdit={handleEdit}
+      onDelete={handleDelete}
+      onSend={handleSend}
+      onPrint={handlePrint}
+      buyers={buyers} // Pass buyers data
+      units={units}   // Pass units data
+      projects={projects} // Pass projects data
+    />
+  ))}
           </div>
 
           {/* Pagination */}
@@ -611,30 +719,31 @@ function InvoicesContent() {
         </div>
       )}
 
-      {/* Overdue Invoices Alert */}
-      {filteredInvoices.filter(inv => 
-        inv.status === 'pending' && new Date(inv.dueDate) < new Date()
-      ).length > 0 && (
-        <div className="fixed top-20 right-6 bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg max-w-sm">
-          <div className="flex items-start space-x-3">
-            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-            <div>
-              <h4 className="text-sm font-medium text-red-900">Overdue Invoices</h4>
-              <p className="text-sm text-red-700 mt-1">
-                You have {filteredInvoices.filter(inv => 
-                  inv.status === 'pending' && new Date(inv.dueDate) < new Date()
-                ).length} overdue invoices requiring attention.
-              </p>
-              <button
-                onClick={() => setStatusFilter('overdue')}
-                className="text-sm text-red-600 hover:text-red-700 font-medium mt-2"
-              >
-                View overdue invoices →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Overdue Invoices Alert */}
+{filteredInvoices.filter(inv => 
+  inv.status === 'pending' && new Date(inv.dueDate) < new Date()
+).length > 0 && (
+  <div className="fixed top-20 right-6 bg-red-50 border border-red-200 rounded-lg p-4 shadow-lg max-w-sm">
+    <div className="flex items-start space-x-3">
+      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+      <div>
+        <h4 className="text-sm font-medium text-red-900">Overdue Invoices</h4>
+        <p className="text-sm text-red-700 mt-1">
+          You have {filteredInvoices.filter(inv => 
+            inv.status === 'pending' && new Date(inv.dueDate) < new Date()
+          ).length} overdue invoices requiring attention.
+        </p>
+        <button
+          onClick={() => setStatusFilter('overdue')}
+          className="text-sm text-red-600 hover:text-red-700 font-medium mt-2"
+        >
+          View overdue invoices →
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 }

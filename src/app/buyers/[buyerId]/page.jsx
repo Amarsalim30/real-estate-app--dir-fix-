@@ -1,13 +1,20 @@
-         'use client';
+'use client';
 import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Buyers } from '@/data/buyers';
-import { Invoices } from '@/data/invoices';
-import { Payments } from '@/data/payments';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
+
+// import { Buyers } from '@/data/buyers';
+// import { Invoices } from '@/data/invoices';
+// import { Payments } from '@/data/payments';
+// import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
+
+import { useBuyer } from '@/hooks/useBuyers';
+import { useInvoices } from '@/hooks/useInvoices';
+import { usePayments } from '@/hooks/usePayments';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
 import { formatPrice } from '@/utils/format';
 import { ROLES, hasPermission } from '@/lib/roles';
 import Link from 'next/link';
@@ -129,66 +136,83 @@ function BuyerProfileContent() {
   const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();
-  const buyerId = parseInt(params.buyerId);
+const buyerId = useMemo(() => {
+  const id = Number(params.buyerId);
+  return isNaN(id) ? null : id;
+}, [params.buyerId]);
 
-  const [buyer, setBuyer] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // const [Loading, setLoading] = useState(true);
+  // const [error, setError] = useState(null);
+
+const { buyer, loading, error } = useBuyer(buyerId);
+
+  const { invoices: Invoices } = useInvoices();
+  const { payments: Payments } = usePayments();
+  const { units: Units } = useUnits();
+  const { projects: Projects } = useProjects();
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
   const isOwnProfile = session?.user?.id === buyerId;
+  
 
-  useEffect(() => {
-    const fetchBuyerData = () => {
-      try {
-        const foundBuyer = Buyers?.find(b => b.id === buyerId);
-        setBuyer(foundBuyer);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching buyer data:', error);
-        setLoading(false);
-      }
-    };
+  console.log('Buyer Profile Content:', { buyer, loading, error });
 
-    fetchBuyerData();
-  }, [buyerId]);
 
-  // Calculate buyer statistics
-  const buyerStats = useMemo(() => {
-    if (!buyer) return null;
-
-    const buyerInvoices = Invoices.filter(inv => inv.buyerId === buyer.id);
-    const buyerPayments = Payments.filter(pay => pay.buyerId === buyer.id);
-    const buyerUnits = Units.filter(unit => 
-      unit.soldTo === buyer.id || unit.reservedBy === buyer.id
-    );
-
-    const totalInvoiced = buyerInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-    const totalPaid = buyerPayments.reduce((sum, pay) => sum + pay.amount, 0);
-    const outstanding = totalInvoiced - totalPaid;
-
-    const completedPayments = buyerPayments.filter(p => p.status === 'completed').length;
-    const pendingInvoices = buyerInvoices.filter(i => i.status === 'pending').length;
-    const overdueInvoices = buyerInvoices.filter(i => 
-      i.status === 'pending' && new Date(i.dueDate) < new Date()
-    ).length;
-
+// Calculate buyer statistics
+const buyerStats = useMemo(() => {
+  if (!buyer || !Invoices || !Payments || !Units) {
     return {
-      properties: buyerUnits.length,
-      ownedProperties: buyerUnits.filter(u => u.soldTo === buyer.id).length,
-      reservedProperties: buyerUnits.filter(u => u.reservedBy === buyer.id).length,
-      totalInvoiced,
-      totalPaid,
-      outstanding,
-      invoiceCount: buyerInvoices.length,
-      paymentCount: buyerPayments.length,
-      completedPayments,
-      pendingInvoices,
-      overdueInvoices,
-      invoices: buyerInvoices,
-      payments: buyerPayments,
-      units: buyerUnits
+      properties: 0,
+      ownedProperties: 0,
+      reservedProperties: 0,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      invoiceCount: 0,
+      paymentCount: 0,
+      completedPayments: 0,
+      pendingInvoices: 0,
+      overdueInvoices: 0,
+      invoices: [],
+      payments: [],
+      units: []
     };
-  }, [buyer]);
+  }
+
+  const buyerInvoices = Invoices.filter(inv => inv.buyerId === buyer.id) || [];
+  const buyerPayments = Payments.filter(pay => pay.buyerId === buyer.id) || [];
+  const buyerUnits = Units.filter(unit => 
+    unit.soldTo === buyer.id || unit.reservedBy === buyer.id
+  ) || [];
+
+  const totalInvoiced = buyerInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+  const totalPaid = buyerPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+  const outstanding = totalInvoiced - totalPaid;
+
+  const completedPayments = buyerPayments.filter(p => p.status === 'completed').length;
+  const pendingInvoices = buyerInvoices.filter(i => i.status === 'pending').length;
+  const overdueInvoices = buyerInvoices.filter(i => 
+    i.status === 'pending' && new Date(i.dueDate) < new Date()
+  ).length;
+
+  return {
+    properties: buyerUnits.length,
+    ownedProperties: buyerUnits.filter(u => u.soldTo === buyer.id).length,
+    reservedProperties: buyerUnits.filter(u => u.reservedBy === buyer.id).length,
+    totalInvoiced,
+    totalPaid,
+    outstanding,
+    invoiceCount: buyerInvoices.length,
+    paymentCount: buyerPayments.length,
+    completedPayments,
+    pendingInvoices,
+    overdueInvoices,
+    invoices: buyerInvoices,
+    payments: buyerPayments,
+    units: buyerUnits
+  };
+}, [buyer, Invoices, Payments, Units]);
+
 
   const handleEdit = () => {
     router.push(`/buyers/${buyerId}/edit`);
@@ -202,32 +226,33 @@ function BuyerProfileContent() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+if (loading || !buyer) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
 
-  if (!buyer) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Buyer Not Found</h2>
-          <p className="text-gray-600 mb-4">The buyer you're looking for doesn't exist.</p>
-          <Link
-            href="/buyers"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Buyers
-          </Link>
-        </div>
+if (error) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Buyer</h2>
+        <p className="text-gray-600 mb-4">{error}</p>
+        <Link
+          href="/buyers"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back to Buyers
+        </Link>
       </div>
-    );
-  }
+    </div>
+  );
+}
+
 
   return (
     <div className="p-6">
@@ -246,7 +271,7 @@ function BuyerProfileContent() {
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
-                {buyer.firstName} {buyer.lastName}
+{buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Loading...'}
               </h1>
               <p className="text-gray-600">{buyer.email}</p>
             </div>
@@ -303,8 +328,7 @@ function BuyerProfileContent() {
 
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between">
-  
-           <div>
+            <div>
               <p className="text-sm font-medium text-gray-600">Outstanding</p>
               <p className={`text-2xl font-bold ${buyerStats.outstanding > 0 ? 'text-red-600' : 'text-gray-600'}`}>
                 {formatPrice(buyerStats.outstanding)}
@@ -365,8 +389,8 @@ function BuyerProfileContent() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Phone</label>
                 <div className="flex items-center">
-                  <p className="text-gray-900">{buyer.phone}</p>
-                  <CopyButton text={buyer.phone} label="phone" />
+                  <p className="text-gray-900">{buyer.phoneNumber}</p>
+                  <CopyButton text={buyer.phoneNumber} label="phone" />
                 </div>
               </div>
 
@@ -378,14 +402,14 @@ function BuyerProfileContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Occupation</label>
-                <p className="text-gray-900">{buyer.occupation || 'Not provided'}</p>
+                <label className="block text-sm font-medium text-gray-600 mb-1">KRA pin</label>
+                <p className="text-gray-900">{buyer.kraPin || 'Not provided'}</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">Annual Income</label>
+                <label className="block text-sm font-medium text-gray-600 mb-1">National ID</label>
                 <p className="text-gray-900">
-                  {buyer.annualIncome ? formatPrice(buyer.annualIncome) : 'Not provided'}
+                  {buyer.nationalId ? buyer.nationalId : 'Not provided'}
                 </p>
               </div>
             </div>
@@ -396,7 +420,7 @@ function BuyerProfileContent() {
                 <MapPin className="w-5 h-5 text-gray-400 mr-2 mt-0.5" />
                 <div>
                   <p className="text-gray-900">
-                    {buyer.address}<br />
+                    {buyer.address|| 'Kenya'}<br />
                     {buyer.city}, {buyer.state} {buyer.postalCode}
                   </p>
                 </div>
@@ -624,7 +648,7 @@ function BuyerProfileContent() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-medium text-green-600">
-                                            {formatPrice(payment.amount)}
+                      {formatPrice(payment.amount)}
                     </p>
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                       payment.status === 'completed' ? 'bg-green-100 text-green-800' :

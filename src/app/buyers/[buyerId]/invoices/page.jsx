@@ -3,11 +3,20 @@ import { useState, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Buyers } from '@/data/buyers';
-import { Invoices, InvoiceStatuses } from '@/data/invoices';
-import { Payments } from '@/data/payments';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
+
+
+// import { Buyers } from '@/data/buyers';
+// import { Invoices, InvoiceStatuses } from '@/data/invoices';
+// import { Payments } from '@/data/payments';
+// import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
+
+import {useBuyer} from '@/hooks/useBuyers';
+import {useInvoices} from '@/hooks/useInvoices';
+import {usePayments} from '@/hooks/usePayments';
+import {useUnits} from '@/hooks/useUnits';
+import {useProjects} from '@/hooks/useProjects';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
@@ -79,7 +88,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const InvoiceRow = ({ invoice, onView }) => {
+const InvoiceRow = ({ invoice, onView ,Units , Projects, Payments }) => {
   const unit = Units.find(u => u.id === invoice.unitId);
   const project = Projects.find(p => p.id === invoice.projectId);
   const payments = Payments.filter(p => p.invoiceId === invoice.id);
@@ -183,6 +192,12 @@ function BuyerInvoicesContent() {
   const params = useParams();
   const router = useRouter();
   const buyerId = parseInt(params.buyerId);
+  const {buyer} = useBuyer(buyerId);
+
+  const {invoices:Invoices} = useInvoices();
+  const {payments:Payments} = usePayments();
+  const {units:Units} = useUnits();
+  const {projects:Projects} = useProjects();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -191,32 +206,13 @@ function BuyerInvoicesContent() {
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
 
-  const buyer = Buyers.find(b => b.id === buyerId);
   const isAdmin = session?.user?.role === ROLES.ADMIN;
-
-  if (!buyer) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Buyer Not Found</h2>
-          <p className="text-gray-600 mb-4">The buyer you're looking for doesn't exist.</p>
-          <Link
-            href="/buyers"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Buyers
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   // Get buyer's invoices
   const buyerInvoices = Invoices.filter(invoice => invoice.buyerId === buyerId);
 
-  // Filter and sort invoices
+
+    // Filter and sort invoices
   const filteredInvoices = useMemo(() => {
     let filtered = buyerInvoices;
 
@@ -345,6 +341,27 @@ function BuyerInvoicesContent() {
     };
   }, [filteredInvoices]);
 
+
+  if (!buyer) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Buyer Not Found</h2>
+          <p className="text-gray-600 mb-4">The buyer you're looking for doesn't exist.</p>
+          <Link
+            href="/buyers"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Buyers
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+
   const handleSort = (field) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -381,9 +398,9 @@ function BuyerInvoicesContent() {
           <div className="flex items-center space-x-3">
             <button
               onClick={() => window.open(`mailto:${buyer.email}`, '_blank')}
-              className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className=" text-blue-600 flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <Mail className="w-4 h-4 mr-2" />
+              <Mail className="text-blue-600 w-4 h-4 mr-2" />
               Email Buyer
             </button>
             <button
@@ -650,6 +667,9 @@ function BuyerInvoicesContent() {
                     key={invoice.id}
                     invoice={invoice}
                     onView={handleViewInvoice}
+                    Units={Units}
+                    Projects={Projects}
+                    Payments={Payments}
                   />
                 ))
               ) : (

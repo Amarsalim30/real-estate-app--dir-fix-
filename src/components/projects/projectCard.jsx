@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useUnits } from '@/hooks/useUnits';
 import { formatPrice } from '@/utils/format';
+import Image from 'next/image';
 import { 
   MapPin, 
   Building, 
@@ -22,6 +23,7 @@ export default function ProjectCard({ project }) {
   const [imageError, setImageError] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const { units } = useUnits();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   // Calculate project statistics - Fixed to handle no units case
   const projectUnits = units.length > 0
@@ -100,13 +102,16 @@ export default function ProjectCard({ project }) {
     >
       {/* Image Section */}
       <div className="relative h-48 overflow-hidden">
+        {console.log(apiBaseUrl)}
         {!imageError && project.images && project.images.length > 0 ? (
-          <img
-            src={project.images[0]}
-            alt={project.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={() => setImageError(true)}
-          />
+           <Image
+      src={`${apiBaseUrl}/images/${project.images[0]}`}
+      alt={project.name}
+      loading="lazy"
+      fill
+      className="object-cover group-hover:scale-105 transition-transform duration-300"
+      onError={() => setImageError(true)}
+    />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
             <Building className="w-16 h-16 text-blue-400" />
