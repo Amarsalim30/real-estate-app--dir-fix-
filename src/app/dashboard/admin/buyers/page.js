@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo,useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Buyers } from '@/data/buyers';
 import { Units } from '@/data/units';
@@ -565,7 +565,7 @@ function CustomersContent() {
                       <label className="text-sm font-medium text-gray-600">Address</label>
                       <p className="text-gray-900">
                         {selectedCustomer.address ? 
-                          `${selectedCustomer.address.street}, ${selectedCustomer.address.city}, ${selectedCustomer.address.state} ${selectedCustomer.address.zipCode}` :
+                          `${selectedCustomer.address.street}, ${selectedCustomer.address.city}, ${selectedCustomer.address.state} ${selectedCustomer.address.postalCode}` :
                           'Not provided'
                         }
                       </p>

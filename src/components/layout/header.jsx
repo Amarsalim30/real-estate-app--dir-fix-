@@ -3,10 +3,13 @@ import { useState } from "react";
 import { Bell, Search, Settings } from "lucide-react";
 import SettingsDropdown from "../ui/SettingsDropdown";
 import { useSession } from "next-auth/react";
+import Notification from "../ui/Notification";
 
 export default function Header({}) {
   const [searchTerm, setSearchTerm] = useState('');
   const { data: session, status } = useSession();
+
+    if (!session) return null; // Optionally show nothing if not logged in
 
 
   return (
@@ -27,9 +30,9 @@ export default function Header({}) {
         </div>
 
         <div className="flex items-center space-x-4">
-                    <button className="p-2 text-gray-400 hover:text-gray-600">
-            <Bell className="w-5 h-5" />
-          </button>
+                    {/* <button className="p-2 text-gray-400 hover:text-gray-600"> */}
+        <Notification />
+          {/* </button> */}
          <SettingsDropdown />
         </div>
       </div>

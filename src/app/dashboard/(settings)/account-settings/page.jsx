@@ -257,13 +257,13 @@ export default function AccountSettingsPage() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className=" min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Shield className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                   <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
           <p className="text-gray-600 mb-6">Please sign in to access account settings.</p>
           <button
-            onClick={() => router.push('/auth/signin')}
+            onClick={() => router.push('/login')}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Sign In
@@ -324,7 +324,7 @@ export default function AccountSettingsPage() {
                     onClick={() => setShowPasswordForm(!showPasswordForm)}
                     className="px-4 py-2 text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    Change Password
+                    {showPasswordForm ? 'Cancel' : "Change Password"}
                   </button>
                 </div>
 
@@ -339,7 +339,7 @@ export default function AccountSettingsPage() {
                           type={showPasswords.current ? 'text' : 'password'}
                           value={passwordForm.currentPassword}
                           onChange={(e) => setPasswordForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="text-gray-700 placeholder-gray-600 w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           required
                         />
                         <button
@@ -361,7 +361,7 @@ export default function AccountSettingsPage() {
                           type={showPasswords.new ? 'text' : 'password'}
                           value={passwordForm.newPassword}
                           onChange={(e) => setPasswordForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="text-gray-700 placeholder-gray-600 w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           required
                           minLength={8}
                         />
@@ -384,7 +384,7 @@ export default function AccountSettingsPage() {
                           type={showPasswords.confirm ? 'text' : 'password'}
                           value={passwordForm.confirmPassword}
                           onChange={(e) => setPasswordForm(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="text-gray-700 placeholder-gray-600 w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           required
                           minLength={8}
                         />
@@ -467,7 +467,7 @@ export default function AccountSettingsPage() {
                 <select
                   value={settings.sessionTimeout}
                   onChange={(e) => handleSettingChange('sessionTimeout', parseInt(e.target.value))}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="text-gray-700 placeholder-gray-600 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value={15}>15 minutes</option>
                   <option value={30}>30 minutes</option>
@@ -522,7 +522,7 @@ export default function AccountSettingsPage() {
                 <select
                   value={settings.profileVisibility}
                   onChange={(e) => handleSettingChange('profileVisibility', e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="text-gray-700 placeholder-gray-600 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="private">Private</option>
                   <option value="agents">Real Estate Agents Only</option>

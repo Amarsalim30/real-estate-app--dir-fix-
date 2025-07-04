@@ -482,7 +482,7 @@ function PaymentDetailContent() {
                 <div>
                   <p className="text-gray-900">
                     {buyer.address}<br />
-                    {buyer.city}, {buyer.state} {buyer.zipCode}
+                    {buyer.city}, {buyer.state} {buyer.postalCode}
                   </p>
                   <p className="text-sm text-gray-600">Address</p>
                 </div>
@@ -531,7 +531,7 @@ function PaymentDetailContent() {
                   <div>
                     <p className="text-gray-900">
                       {project.address}<br />
-                      {project.city}, {project.state} {project.zipCode}
+                      {project.city}, {project.state} {project.postalCode}
                     </p>
                     <p className="text-sm text-gray-600">Property Address</p>
                   </div>

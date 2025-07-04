@@ -43,6 +43,7 @@ export default function UnitDetailPage() {
   const { projects, loading: isLoading, error } = useProjects();
   const { buyers } = useBuyers();
   const { units } = useUnits();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const unit = useMemo(() => {
     if (!units || !Array.isArray(units) || !params?.unitId) return null;
@@ -198,7 +199,7 @@ export default function UnitDetailPage() {
               <div className="relative h-96">
                 {unit.images && unit.images.length > 0 ? (
                   <img
-                    src={unit.images[activeImageIndex]}
+                    src={`${apiBaseUrl}/images/${unit.images[activeImageIndex]}`}
                     alt={`Unit ${unit.unitNumber}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {

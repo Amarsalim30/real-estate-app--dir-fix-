@@ -1,12 +1,18 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo ,useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Invoices, InvoiceStatuses } from '@/data/invoices';
-import { Units } from '@/data/units';
-import { Buyers } from '@/data/buyers';
-import { Projects } from '@/data/projects';
+import {  InvoiceStatuses } from '@/data/invoices';
+// import { Units } from '@/data/units';
+// import { Buyers } from '@/data/buyers';
+// import { Projects } from '@/data/projects';
+
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
+import { useInvoices } from '@/hooks/useInvoices';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import { 
@@ -78,10 +84,10 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const InvoiceRow = ({ invoice, onView, isAdmin }) => {
-  const unit = Units.find(u => u.id === invoice.unitId);
-  const buyer = Buyers.find(b => b.id === invoice.buyerId);
-  const project = Projects.find(p => p.id === invoice.projectId);
+const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
+  const unit = units?.find(u => u.id === invoice.unitId);
+  const buyer = buyers?.find(b => b.id === invoice.buyerId);
+  const project = projects?.find(p => p.id === invoice.projectId);
 
   const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
                    new Date(invoice.dueDate) < new Date();
@@ -169,6 +175,11 @@ const InvoiceRow = ({ invoice, onView, isAdmin }) => {
 };
 
 function InvoicesContent() {
+  const { buyers, loading: buyersLoading, error: buyersError } = useBuyers();
+  const { units, loading: unitsLoading, error: unitsError } = useUnits();
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const { invoices, loading: invoicesLoading, error: invoicesError } = useInvoices();
+
   const { data: session } = useSession();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -181,47 +192,52 @@ function InvoicesContent() {
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
   // Get user's buyer ID for filtering
-  const getUserBuyerId = () => {
-    if (session?.user?.buyerId) {
-      return session.user.buyerId;
-    }
-    
-    // Fallback: find buyer by email if buyerId not in session
-    const buyer = Buyers.find(b => b.email === session?.user?.email);
-    return buyer?.id || null;
-  };
+// Get user's buyer ID for filtering
+const getUserBuyerId = () => {
+  if (session?.user?.buyerId) {
+    return session.user.buyerId;
+  }
+  
+  // Fallback: find buyer by email if buyerId not in session
+  const buyer = buyers?.find(b => b.email === session?.user?.email);
+  return buyer?.id || null;
+};
+
 
   const userBuyerId = getUserBuyerId();
 
   // Get filtered invoices based on user role
-  const getFilteredInvoices = () => {
-    if (isAdmin) {
-      return Invoices; // Admin sees all invoices
-    } else {
-      // Regular users only see their own invoices
-      return Invoices.filter(invoice => invoice.buyerId === userBuyerId);
-    }
-  };
+// Get filtered invoices based on user role
+const getFilteredInvoices = () => {
+  if (!invoices) return []; // Handle loading state
+  if (isAdmin) {
+    return invoices; // Admin sees all invoices
+  } else {
+    // Regular users only see their own invoices
+    return invoices.filter(invoice => invoice.buyerId === userBuyerId);
+  }
+};
 
-  // Filter and sort invoices
-  const filteredInvoices = useMemo(() => {
-    let filtered = getFilteredInvoices();
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(invoice => {
-        const buyer = Buyers.find(b => b.id === invoice.buyerId);
-        const unit = Units.find(u => u.id === invoice.unitId);
-        const project = Projects.find(p => p.id === invoice.projectId);
-        
-        return (
-          invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (project && project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      });
-    }
+// Filter and sort invoices
+const filteredInvoices = useMemo(() => {
+  let filtered = getFilteredInvoices();
+
+  // Filter by search term
+  if (searchTerm) {
+    filtered = filtered.filter(invoice => {
+      const buyer = buyers?.find(b => b.id === invoice.buyerId);
+      const unit = units?.find(u => u.id === invoice.unitId);
+      const project = projects?.find(p => p.id === invoice.projectId);
+      
+      return (
+        invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    });
+  }
 
     // Filter by status
     if (statusFilter !== 'all') {
@@ -293,7 +309,7 @@ function InvoicesContent() {
     });
 
     return filtered;
-  }, [searchTerm, statusFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId]);
+  }, [searchTerm, statusFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId, invoices, buyers, units, projects]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -337,6 +353,48 @@ function InvoicesContent() {
   const handleViewInvoice = (invoice) => {
     router.push(`/invoices/${invoice.id}`);
   };
+
+  // Check loading states
+const isLoading = buyersLoading || unitsLoading || projectsLoading || invoicesLoading;
+
+// Check error states
+const hasError = buyersError || unitsError || projectsError || invoicesError;
+const errorMessage = buyersError || unitsError || projectsError || invoicesError;
+
+// Add loading state before the main return
+if (isLoading) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading invoices...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Add error state
+if (hasError) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-4">{errorMessage}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
   return (
     <div className="p-6">
@@ -550,7 +608,7 @@ function InvoicesContent() {
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {filteredInvoices.length} of {isAdmin ? Invoices.length : getFilteredInvoices().length} invoices
+              Showing {filteredInvoices.length} of {isAdmin ? invoices.length : getFilteredInvoices().length} invoices
             </span>
             <div className="flex items-center space-x-4">
               <span>Paid: {summaryStats.paid}</span>
@@ -760,6 +818,17 @@ export default function InvoicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
+  }
+
+  
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -767,12 +836,6 @@ export default function InvoicesPage() {
       </div>
     );
   }
-
-  if (!session?.user) {
-    router.push('/login');
-    return null;
-  }
-
   // Allow access for all authenticated users
   const canViewInvoices = session.user.role === ROLES.ADMIN || 
                          session.user.role === ROLES.MANAGER ||

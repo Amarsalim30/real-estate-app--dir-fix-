@@ -309,12 +309,14 @@ const recentActivity = useMemo(() => {
 
   if (!session?.user) {
     return (
+      <Link href="/login" >
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Please Sign In</h2>
           <p className="text-gray-600">You need to be signed in to view your dashboard.</p>
         </div>
       </div>
+      </Link>
     );
   }
 
@@ -539,7 +541,7 @@ const recentActivity = useMemo(() => {
                       description="Manage your account info"
                       icon={Settings}
                       color="text-gray-600"
-                      onClick={() => setActiveTab('profile')}
+                      onClick={() => router.push('/dashboard/profile')}
                     />
                     <QuickActionCard
                       title="Get Support"
@@ -932,7 +934,7 @@ const recentActivity = useMemo(() => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">ZIP Code</label>
-                  <p className="text-gray-900">{buyer.zipCode}</p>
+                  <p className="text-gray-900">{buyer.postalCode}</p>
                 </div>
 
                 <div>

@@ -1,13 +1,16 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo ,useEffect} from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+
+//hooks
 import { useBuyers } from '@/hooks/useBuyers';
 import { useProjects } from '@/hooks/useProjects';
 import { useUnits } from '@/hooks/useUnits';
 import { useInvoices } from '@/hooks/useInvoices';
 import { usePayments } from '@/hooks/usePayments';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES, hasPermission } from '@/lib/roles';
 import Link from 'next/link';
@@ -121,13 +124,13 @@ const BuyerCard = ({ buyer, stats, onView, onEdit }) => (
           onClick={() => onEdit(buyer)}
           className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
-          <Edit className="w-4 h-4" />
+          <Edit className="text-blue-600 w-4 h-4" />
         </button>
         <Link
           href={`mailto:${buyer.email}`}
           className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
         >
-          <Mail className="w-4 h-4" />
+          <Mail className="text-blue-600 w-4 h-4" />
         </Link>
       </div>
     </div>
@@ -232,138 +235,185 @@ function BuyersContent() {
   const { payments } = usePayments();
 
 
-  // Calculate buyer statistics
-  const buyersWithStats = useMemo(() => {
-    if (!buyers || !Array.isArray(buyers)) return [];
-    if (!invoices || !Array.isArray(invoices)) return [];
-    if (!payments || !Array.isArray(payments)) return [];
-    if (!units || !Array.isArray(units)) return [];
-
-    return buyers.map(buyer => {
-      const buyerInvoices = invoices.filter(inv => inv.buyerId === buyer.id);
-      const buyerPayments = payments.filter(pay => pay.buyerId === buyer.id);
-      const buyerUnits = units.filter(unit => 
-        unit.soldTo === buyer.id || unit.reservedBy === buyer.id
-      );
-
-      const totalInvoiced = buyerInvoices.reduce((sum, inv) => sum + inv.totalAmount, 0);
-      const totalPaid = buyerPayments.reduce((sum, pay) => sum + pay.amount, 0);
-      const outstanding = totalInvoiced - totalPaid;
-
-      return {
-        ...buyer,
-        stats: {
-          properties: buyerUnits.length,
-          totalInvoiced,
-          totalPaid,
-          outstanding,
-          invoiceCount: buyerInvoices.length,
-          paymentCount: buyerPayments.length
-        }
-      };
-    });
-  }, [buyers, invoices, payments, units]);
-
-  // Filter and sort buyers
-  const filteredBuyers = useMemo(() => {
-    if (!buyersWithStats || !Array.isArray(buyersWithStats)) {
-      return [];
+// Calculate buyer statistics
+const buyersWithStats = useMemo(() => {
+  if (!buyers || !Array.isArray(buyers)) return [];
+  if (!invoices || !Array.isArray(invoices)) return buyers.map(buyer => ({
+    ...buyer,
+    stats: {
+      properties: 0,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      invoiceCount: 0,
+      paymentCount: 0
     }
-    
-    let filtered = buyersWithStats;
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(buyer =>
-        `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        buyer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        buyer.phone.includes(searchTerm) ||
-        buyer.city.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+  }));
+  if (!payments || !Array.isArray(payments)) return buyers.map(buyer => ({
+    ...buyer,
+    stats: {
+      properties: 0,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      invoiceCount: 0,
+      paymentCount: 0
     }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(buyer => {
-        switch (statusFilter) {
-          case 'current':
-            return buyer.stats.outstanding <= 0;
-          case 'outstanding':
-            return buyer.stats.outstanding > 0;
-          case 'active':
-            return buyer.stats.properties > 0;
-          case 'inactive':
-            return buyer.stats.properties === 0;
-          default:
-            return true;
-        }
-      });
+  }));
+  if (!units || !Array.isArray(units)) return buyers.map(buyer => ({
+    ...buyer,
+    stats: {
+      properties: 0,
+      totalInvoiced: 0,
+      totalPaid: 0,
+      outstanding: 0,
+      invoiceCount: 0,
+      paymentCount: 0
     }
+  }));
 
-    // Sort
-    filtered.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'name':
-          aValue = `${a.firstName} ${a.lastName}`;
-          bValue = `${b.firstName} ${b.lastName}`;
-          break;
-        case 'email':
-          aValue = a.email;
-          bValue = b.email;
-          break;
-        case 'properties':
-          aValue = a.stats.properties;
-          bValue = b.stats.properties;
-          break;
-        case 'totalPaid':
-          aValue = a.stats.totalPaid;
-          bValue = b.stats.totalPaid;
-          break;
-        case 'outstanding':
-          aValue = a.stats.outstanding;
-          bValue = b.stats.outstanding;
-          break;
-        case 'creditScore':
-          aValue = a.creditScore || 0;
-          bValue = b.creditScore || 0;
-          break;
-        default:
-          aValue = new Date(a.createdAt);
-          bValue = new Date(b.createdAt);
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+  return buyers.map(buyer => {
+    const buyerInvoices = invoices.filter(inv => inv.buyerId === buyer.id);
+    const buyerPayments = payments.filter(pay => pay.buyerId === buyer.id);
+    const buyerUnits = units.filter(unit => 
+      unit.soldTo === buyer.id || unit.reservedBy === buyer.id
+    );
 
-    return filtered;
-  }, [buyersWithStats, searchTerm, statusFilter, sortBy, sortOrder]);
-
-  // Summary statistics
-  const summaryStats = useMemo(() => {
-    const total = filteredBuyers.length;
-    const active = filteredBuyers.filter(b => b.stats.properties > 0).length;
-    const withOutstanding = filteredBuyers.filter(b => b.stats.outstanding > 0).length;
-    const totalRevenue = filteredBuyers.reduce((sum, b) => sum + b.stats.totalPaid, 0);
-    const totalOutstanding = filteredBuyers.reduce((sum, b) => sum + b.stats.outstanding, 0);
-    const avgCreditScore = filteredBuyers
-      .filter(b => b.creditScore)
-      .reduce((sum, b, _, arr) => sum + b.creditScore / arr.length, 0);
+    const totalInvoiced = buyerInvoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+    const totalPaid = buyerPayments.reduce((sum, pay) => sum + (pay.amount || 0), 0);
+    const outstanding = totalInvoiced - totalPaid;
 
     return {
-      total,
-      active,
-      withOutstanding,
-      totalRevenue,
-      totalOutstanding,
-      avgCreditScore: Math.round(avgCreditScore)
+      ...buyer,
+      stats: {
+        properties: buyerUnits.length,
+        totalInvoiced,
+        totalPaid,
+        outstanding,
+        invoiceCount: buyerInvoices.length,
+        paymentCount: buyerPayments.length
+      }
     };
-  }, [filteredBuyers]);
+  });
+}, [buyers, invoices, payments, units]);
+
+
+// Filter and sort buyers
+const filteredBuyers = useMemo(() => {
+  if (!buyersWithStats || !Array.isArray(buyersWithStats)) {
+    return [];
+  }
+  
+  let filtered = [...buyersWithStats];
+
+  // Search filter
+  if (searchTerm) {
+    const searchLower = searchTerm.toLowerCase();
+    filtered = filtered.filter(buyer =>
+      `${buyer.firstName || ''} ${buyer.lastName || ''}`.toLowerCase().includes(searchLower) ||
+      (buyer.email || '').toLowerCase().includes(searchLower) ||
+      (buyer.phone || '').includes(searchTerm) ||
+      (buyer.city || '').toLowerCase().includes(searchLower)
+    );
+  }
+
+  // Status filter
+  if (statusFilter !== 'all') {
+    filtered = filtered.filter(buyer => {
+      const stats = buyer.stats || {};
+      switch (statusFilter) {
+        case 'current':
+          return (stats.outstanding || 0) <= 0;
+        case 'outstanding':
+          return (stats.outstanding || 0) > 0;
+        case 'active':
+          return (stats.properties || 0) > 0;
+        case 'inactive':
+          return (stats.properties || 0) === 0;
+        default:
+          return true;
+      }
+    });
+  }
+
+  // Sort
+  filtered.sort((a, b) => {
+    let aValue, bValue;
+    
+    switch (sortBy) {
+      case 'name':
+        aValue = `${a.firstName || ''} ${a.lastName || ''}`;
+        bValue = `${b.firstName || ''} ${b.lastName || ''}`;
+        break;
+      case 'email':
+        aValue = a.email || '';
+        bValue = b.email || '';
+        break;
+      case 'properties':
+        aValue = a.stats?.properties || 0;
+        bValue = b.stats?.properties || 0;
+        break;
+      case 'totalPaid':
+        aValue = a.stats?.totalPaid || 0;
+        bValue = b.stats?.totalPaid || 0;
+        break;
+      case 'outstanding':
+        aValue = a.stats?.outstanding || 0;
+        bValue = b.stats?.outstanding || 0;
+        break;
+      case 'creditScore':
+        aValue = a.creditScore || 0;
+        bValue = b.creditScore || 0;
+        break;
+      default:
+        aValue = new Date(a.createdAt || 0);
+        bValue = new Date(b.createdAt || 0);
+    }
+    
+    if (sortOrder === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    } else {
+      return aValue < bValue ? 1 : -1;
+    }
+  });
+
+  return filtered;
+}, [buyersWithStats, searchTerm, statusFilter, sortBy, sortOrder]);
+
+// Summary statistics
+const summaryStats = useMemo(() => {
+  if (!filteredBuyers || !Array.isArray(filteredBuyers)) {
+    return {
+      total: 0,
+      active: 0,
+      withOutstanding: 0,
+      totalRevenue: 0,
+      totalOutstanding: 0,
+      avgCreditScore: 0
+    };
+  }
+
+  const total = filteredBuyers.length;
+  const active = filteredBuyers.filter(b => (b.stats?.properties || 0) > 0).length;
+  const withOutstanding = filteredBuyers.filter(b => (b.stats?.outstanding || 0) > 0).length;
+  const totalRevenue = filteredBuyers.reduce((sum, b) => sum + (b.stats?.totalPaid || 0), 0);
+  const totalOutstanding = filteredBuyers.reduce((sum, b) => sum + (b.stats?.outstanding || 0), 0);
+  
+  const buyersWithCreditScore = filteredBuyers.filter(b => b.creditScore);
+  const avgCreditScore = buyersWithCreditScore.length > 0
+    ? buyersWithCreditScore.reduce((sum, b) => sum + b.creditScore, 0) / buyersWithCreditScore.length
+    : 0;
+
+  return {
+    total,
+    active,
+    withOutstanding,
+    totalRevenue,
+    totalOutstanding,
+    avgCreditScore: Math.round(avgCreditScore)
+  };
+}, [filteredBuyers]);
+
 
     if (isLoading) {
     return (
@@ -401,7 +451,7 @@ function BuyersContent() {
         <div className="flex items-center space-x-3">
           <button
             onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-            className="flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="text-gray-500 flex items-center px-3 py-2 border border-gray-300 rounded-lg hover:bg-blue-600 hover:text-white transition-colors"
           >
             {viewMode === 'table' ? 'Card View' : 'Table View'}
           </button>
@@ -745,17 +795,21 @@ export default function BuyersPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-  if (status === 'loading') {
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
+  }
+
+    if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
-
-  if (!session?.user) {
-    router.push('/login');
-    return null;
   }
 
   // Admin only access

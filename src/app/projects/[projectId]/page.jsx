@@ -2,9 +2,12 @@
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProjects';
-import { useUnits } from '@/hooks/useUnits';
-import { formatPrice } from '@/utils/format';
+import { useUnits } from '@/hooks/useUnits'; import { formatPrice } from '@/utils/format';
 import { ConstructionStages, getConstructionStageColor, getConstructionProgressPercentage } from '@/lib/constructionStages';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import BookVisitModal from '@/components/ui/BookingVisit'
+import Image from 'next/image';
+
 import {
   ArrowLeft,
   MapPin,
@@ -29,11 +32,131 @@ import {
   DollarSign,
   Award,
   Wrench,
-  TrendingUp
+  TrendingUp,
+  Navigation,
+  Book
 } from 'lucide-react';
+
+// Google Maps configuration
+const mapContainerStyle = {
+  width: '100%',
+  height: '400px',
+  borderRadius: '0.5rem'
+};
+
+const defaultCenter = {
+  lat: -1.2921, // Default to Nairobi, Kenya
+  lng: 36.8219,
+};
+
+// Google Maps component
+function ProjectMap({ project }) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  });
+
+  const center = useMemo(() => {
+    if (project?.latitude && project?.longitude) {
+      return {
+        lat: parseFloat(project.latitude),
+        lng: parseFloat(project.longitude),
+      };
+    }
+    return defaultCenter;
+  }, [project]);
+
+  if (loadError) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <MapPin className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">Map Error</h4>
+          <p className="text-gray-600">Unable to load map. Please check your internet connection.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">Map Configuration Required</h4>
+          <p className="text-gray-600">Google Maps API key not configured</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={15}
+        options={{
+          zoomControl: true,
+          streetViewControl: true,
+          mapTypeControl: true,
+          fullscreenControl: true,
+        }}
+      >
+        <Marker
+          position={center}
+          title={project?.name}
+          icon={{
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2C10.48 2 6 6.48 6 12C6 20 16 30 16 30C16 30 26 20 26 12C26 6.48 21.52 2 16 2ZM16 16C13.79 16 12 14.21 12 12C12 9.79 13.79 8 16 8C18.21 8 20 9.79 20 12C20 14.21 18.21 16 16 16Z" fill="#3B82F6"/>
+              </svg>
+            `),
+            scaledSize: new window.google.maps.Size(32, 32),
+          }}
+        />
+      </GoogleMap>
+
+      {/* Map Controls */}
+      <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center">
+          <Navigation className="w-4 h-4 mr-1" />
+          <span>
+            {project?.latitude && project?.longitude
+              ? `${parseFloat(project.latitude).toFixed(4)}, ${parseFloat(project.longitude).toFixed(4)}`
+              : 'Coordinates not available'
+            }
+          </span>
+        </div>
+        <button
+          onClick={() => {
+            const url = `https://www.google.com/maps/search/?api=1&query=${center.lat},${center.lng}`;
+            window.open(url, '_blank');
+          }}
+          className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <MapPin className="w-4 h-4 mr-1" />
+          Open in Google Maps
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [imageError, setImageError] = useState(false);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -82,8 +205,18 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
             <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center relative">
-              <Building className="w-8 h-8 text-gray-400" />
-              {unit.isFeatured && (
+              {unit.images && unit.images.length > 0 && !imageError ? (
+                <img
+                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                  alt={`Unit ${unit.unitNumber}`}
+                  className="w-full h-32 object-cover"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <Building className="w-8 h-8 text-gray-400" />
+
+              )}
+              {unit.featured && (
                 <div className="absolute -top-1 -right-1">
                   <Award className="w-4 h-4 text-yellow-500" />
                 </div>
@@ -152,8 +285,19 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
       onClick={handleUnitClick}
     >
+
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
-        <Building className="w-16 h-16 text-gray-400" />
+        {unit.images && unit.images.length > 0 && !imageError ? (
+
+          <img
+            src={`${apiBaseUrl}/images/${unit.images[0]}`}
+            alt={`Unit ${unit.unitNumber}`}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Building className="w-16 h-16 text-gray-400" />
+        )}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
             {unit.status?.replace('_', ' ')}
@@ -165,7 +309,7 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             </span>
           )}
         </div>
-        {unit.isFeatured && (
+        {unit.featured && (
           <div className="absolute top-4 left-4">
             <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-medium flex items-center">
               <Award className="w-3 h-3 mr-1" />
@@ -184,7 +328,7 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             {getUnitTypeDisplay(unit.unitType)}
           </span>
         </div>
-        
+
         <p className="text-gray-600 text-sm mb-4 line-clamp-2">{unit.description}</p>
 
         <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
@@ -229,6 +373,22 @@ export default function ProjectDetailPage() {
   const [unitsSortBy, setUnitsSortBy] = useState('unitNumber');
   const { projects, loading: isLoading, error } = useProjects();
   const { units } = useUnits();
+  const [open, setOpen] = useState(false)
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [imageError, setImageError] = useState(false);
+
+
+  const handleBooking = async ({ datetime, phone }) => {
+    const res = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datetime, phone }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json()
+      throw new Error(error || 'Failed')
+    }
+  }
 
   const project = useMemo(() => {
     if (!projects || !Array.isArray(projects) || !params?.projectId) {
@@ -268,7 +428,7 @@ export default function ProjectDetailPage() {
     }, {});
 
     // Overall project construction progress
-    const projectConstructionProgress = project?.currentConstructionStage 
+    const projectConstructionProgress = project?.currentConstructionStage
       ? getConstructionProgressPercentage(project.currentConstructionStage)
       : 0;
 
@@ -408,21 +568,20 @@ export default function ProjectDetailPage() {
 
         {/* Hero Section */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
+
           <div className="relative h-96">
-            {project.images && project.images.length > 0 ? (
+            {!imageError && project.images && project.images.length > 0 ? (
               <img
-                src={project.images[0]}
+                src={`${apiBaseUrl}/images/${project.images[0]}`}
                 alt={project.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
+                className="w-full h-full object-cover "
+                onError={() => setImageError(true)}
               />
-            ) : null}
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-              <Building className="w-24 h-24 text-blue-400" />
-            </div>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                <Building className="w-24 h-24 text-blue-400" />
+              </div>
+            )}
 
             {/* Overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
@@ -661,7 +820,7 @@ export default function ProjectDetailPage() {
                       <Phone className="w-5 h-5 text-blue-600 mr-3" />
                       <div>
                         <div className="font-medium text-gray-900">Sales Office</div>
-                        <div className="text-gray-600">+1 (555) 123-4567</div>
+                        <div className="text-gray-600">+254 (700) 123-456</div>
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -685,7 +844,7 @@ export default function ProjectDetailPage() {
                     <select
                       value={unitsFilter}
                       onChange={(e) => setUnitsFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="text-gray-800 placeholder-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="all">All Units ({stats.total})</option>
                       <option value="AVAILABLE">Available ({stats.available})</option>
@@ -698,7 +857,7 @@ export default function ProjectDetailPage() {
                     <select
                       value={unitsSortBy}
                       onChange={(e) => setUnitsSortBy(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="text-gray-800 placeholder-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="unitNumber">Unit Number</option>
                       <option value="price-asc">Price: Low to High</option>
@@ -761,7 +920,7 @@ export default function ProjectDetailPage() {
               <div className="space-y-8">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900 mb-6">Construction Progress Overview</h3>
-                  
+
                   {/* Overall Project Progress */}
                   <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8">
                     <div className="flex items-center justify-between mb-4">
@@ -774,14 +933,14 @@ export default function ProjectDetailPage() {
                         <div className="text-sm text-gray-600">Complete</div>
                       </div>
                     </div>
-                    
+
                     <div className="w-full bg-white rounded-full h-4 mb-4">
-                      <div 
+                      <div
                         className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-500"
                         style={{ width: `${stats.projectConstructionProgress}%` }}
                       />
                     </div>
-                    
+
                     <div className="flex justify-between text-sm text-gray-600">
                       <span>Started</span>
                       <span>In Progress</span>
@@ -796,22 +955,20 @@ export default function ProjectDetailPage() {
                       {Object.entries(ConstructionStages).map(([key, stage]) => {
                         const isCompleted = stats.projectConstructionProgress >= stage.milestone;
                         const isCurrent = project.currentConstructionStage === key;
-                        
+
                         return (
-                          <div key={key} className={`flex items-center p-4 rounded-lg border-2 transition-all ${
-                            isCurrent 
-                              ? 'border-blue-500 bg-blue-50' 
-                              : isCompleted 
-                                ? 'border-green-200 bg-green-50' 
+                          <div key={key} className={`flex items-center p-4 rounded-lg border-2 transition-all ${isCurrent
+                              ? 'border-blue-500 bg-blue-50'
+                              : isCompleted
+                                ? 'border-green-200 bg-green-50'
                                 : 'border-gray-200 bg-gray-50'
-                          }`}>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 ${
-                              isCurrent 
-                                ? 'bg-blue-500 text-white' 
-                                : isCompleted 
-                                  ? 'bg-green-500 text-white' 
-                                  : 'bg-gray-300 text-gray-600'
                             }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 ${isCurrent
+                                ? 'bg-blue-500 text-white'
+                                : isCompleted
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
                               {isCompleted ? (
                                 <CheckCircle className="w-5 h-5" />
                               ) : isCurrent ? (
@@ -820,25 +977,23 @@ export default function ProjectDetailPage() {
                                 <span className="text-sm font-medium">{stage.milestone}</span>
                               )}
                             </div>
-                            
+
                             <div className="flex-1">
                               <div className="flex items-center justify-between">
-                                <h5 className={`font-medium ${
-                                  isCurrent ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-gray-700'
-                                }`}>
+                                <h5 className={`font-medium ${isCurrent ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-gray-700'
+                                  }`}>
                                   {stage.label}
                                 </h5>
-                                <span className={`text-sm px-2 py-1 rounded-full ${
-                                  isCurrent 
-                                    ? 'bg-blue-100 text-blue-800' 
-                                    : isCompleted 
-                                      ? 'bg-green-100 text-green-800' 
+                                <span className={`text-sm px-2 py-1 rounded-full ${isCurrent
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : isCompleted
+                                      ? 'bg-green-100 text-green-800'
                                       : 'bg-gray-100 text-gray-600'
-                                }`}>
+                                  }`}>
                                   {stage.milestone}% Milestone
                                 </span>
                               </div>
-                              
+
                               {isCurrent && (
                                 <p className="text-sm text-blue-700 mt-1">Currently in progress</p>
                               )}
@@ -860,7 +1015,8 @@ export default function ProjectDetailPage() {
                         {Object.entries(stats.stageBreakdown).map(([stage, count]) => (
                           <div key={stage} className="bg-white border rounded-lg p-4">
                             <div className="flex items-center justify-between mb-2">
-                              <span className={`px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(stage)}`}>
+                              <span className={`
+px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(stage)}`}>
                                 {ConstructionStages[stage]?.label}
                               </span>
                               <span className="text-2xl font-bold text-gray-900">{count}</span>
@@ -869,7 +1025,7 @@ export default function ProjectDetailPage() {
                               {((count / stats.total) * 100).toFixed(1)}% of total units
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                              <div 
+                              <div
                                 className="bg-blue-500 h-2 rounded-full"
                                 style={{ width: `${(count / stats.total) * 100}%` }}
                               />
@@ -898,7 +1054,7 @@ export default function ProjectDetailPage() {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                                        <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">No Amenities Listed</h3>
                     <p className="text-gray-600">
                       Amenity information will be updated soon.
@@ -921,6 +1077,11 @@ export default function ProjectDetailPage() {
                         <div>
                           <div className="font-medium text-gray-900">{project.address}</div>
                           <div className="text-gray-600">{project.subCounty}, {project.county}</div>
+                          {project.latitude && project.longitude && (
+                            <div className="text-sm text-gray-500 mt-1">
+                              Coordinates: {parseFloat(project.latitude).toFixed(4)}, {parseFloat(project.longitude).toFixed(4)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -932,16 +1093,25 @@ export default function ProjectDetailPage() {
                       Located in {project.subCounty}, {project.county}, this development offers easy access to
                       shopping, dining, entertainment, and public transportation.
                     </p>
+
+                    {/* Nearby Places */}
+                    <div className="mt-4">
+                      <h5 className="font-medium text-gray-900 mb-2">Nearby Amenities</h5>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>• Shopping centers and markets</div>
+                        <div>• Schools and educational institutions</div>
+                        <div>• Healthcare facilities</div>
+                        <div>• Public transportation</div>
+                        <div>• Recreational facilities</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Map Placeholder */}
-                <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Interactive Map</h4>
-                    <p className="text-gray-600">Map integration coming soon</p>
-                  </div>
+                {/* Google Map */}
+                <div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Interactive Map</h4>
+                  <ProjectMap project={project} />
                 </div>
               </div>
             )}
@@ -955,7 +1125,7 @@ export default function ProjectDetailPage() {
                     {project.images.map((image, index) => (
                       <div key={index} className="aspect-w-16 aspect-h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
-                          src={image}
+                          src={`${apiBaseUrl}/images/${image}`}
                           alt={`${project.name} - Image ${index + 1}`}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
@@ -984,18 +1154,44 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-blue-600 rounded-xl p-8 text-center text-white">
+        <div className="bg-blue-600 rounded-xl p-8 text-center text-white ">
           <h3 className="text-2xl font-bold mb-4">Interested in {project.name}?</h3>
           <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
             Contact our sales team to schedule a viewing, get more information, or reserve your unit today.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-              Schedule Viewing
-            </button>
-            <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
-              Download Brochure
-            </button>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <div className='p-7'>
+              <button className="px-8 py-3 border-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-600 hover:text-white transition-colors"
+                onClick={() => setOpen(true)}
+              >
+                Book a Visit
+              </button>
+              <BookVisitModal
+                isOpen={open}
+                onClose={() => setOpen(false)}
+                onBooking={handleBooking}
+              />
+            </div>
+            {/* Modal is conditionally rendered */}
+            <div className="p-7">
+              <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                Download Brochure
+              </button>
+            </div>
+            <div className='p-8'>
+              {project.latitude && project.longitude && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${project.latitude},${project.longitude}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors flex items-center justify-center"
+                >
+                  <Navigation className="w-4 h-4 mr-2" />
+                  Get Directions
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

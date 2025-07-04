@@ -39,9 +39,13 @@ export default function UnitReservePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check authentication
-  if (!session?.user) {
-    router.push('/login');
-    return null;
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
   }
 
   const unit = Array.isArray(units) ? units.find(u => u.id === parseInt(params.unitId)) : null;

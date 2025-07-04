@@ -1,13 +1,20 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo ,useEffect} from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Payments, PaymentMethods, PaymentStatuses } from '@/data/payments';
-import { Invoices } from '@/data/invoices';
-import { Units } from '@/data/units';
-import { Buyers } from '@/data/buyers';
-import { Projects } from '@/data/projects';
+
+import {  PaymentMethods, PaymentStatuses } from '@/data/payments';
+// import { Invoices } from '@/data/invoices';
+// import { Units } from '@/data/units';
+// import { Buyers } from '@/data/buyers';
+// import { Projects } from '@/data/projects';
+
+import { usePayments } from '@/hooks/usePayments';
+import { useInvoices } from '@/hooks/useInvoices';
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import { 
@@ -98,11 +105,12 @@ const PaymentMethodIcon = ({ method }) => {
   }
 };
 
-const PaymentRow = ({ payment, onView, isAdmin }) => {
-  const invoice = Invoices.find(i => i.id === payment.invoiceId);
-  const unit = Units.find(u => u.id === payment.unitId);
-  const buyer = Buyers.find(b => b.id === payment.buyerId);
-  const project = Projects.find(p => p.id === invoice?.projectId);
+const PaymentRow = ({ payment, onView, isAdmin,invoices,units,buyers,projects }) => {
+  
+  const invoice = invoices.find(i => i.id === payment.invoiceId);
+  const unit = units.find(u => u.id === payment.unitId);
+  const buyer = buyers.find(b => b.id === payment.buyerId);
+  const project = projects.find(p => p.id === invoice?.projectId);
 
   return (
     <tr className="hover:bg-gray-50 border-b border-gray-200">
@@ -190,8 +198,15 @@ const PaymentRow = ({ payment, onView, isAdmin }) => {
 };
 
 function PaymentsContent() {
+  const{buyers ,loading: buyersLoading } = useBuyers();
+  const {projects, loading: projectsLoading} = useProjects();
+  const {units, loading: unitsLoading} = useUnits();
+  const {invoices, loading: invoicesLoading} = useInvoices();
+  const { payments, loading: paymentsLoading } = usePayments();
+
   const { data: session } = useSession();
   const router = useRouter();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -209,7 +224,7 @@ function PaymentsContent() {
     }
     
     // Fallback: find buyer by email if buyerId not in session
-    const buyer = Buyers.find(b => b.email === session?.user?.email);
+    const buyer = buyers.find(b => b.email === session?.user?.email);
     return buyer?.id || null;
   };
 
@@ -218,13 +233,13 @@ function PaymentsContent() {
   // Filter payments based on user role
   const getFilteredPayments = () => {
     if (isAdmin) {
-      return Payments; // Admin sees all payments
+      return payments; // Admin sees all payments
     } else {
       // Non-admin users see only their own payments
       if (!userBuyerId) {
         return []; // No payments if user not linked to a buyer
       }
-      return Payments.filter(payment => payment.buyerId === userBuyerId);
+      return payments.filter(payment => payment.buyerId === userBuyerId);
     }
   };
 
@@ -235,10 +250,10 @@ function PaymentsContent() {
     // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(payment => {
-        const buyer = Buyers.find(b => b.id === payment.buyerId);
-        const unit = Units.find(u => u.id === payment.unitId);
-        const invoice = Invoices.find(i => i.id === payment.invoiceId);
-        const project = Projects.find(p => p.id === invoice?.projectId);
+        const buyer = buyers.find(b => b.id === payment.buyerId);
+        const unit = units.find(u => u.id === payment.unitId);
+        const invoice = invoices.find(i => i.id === payment.invoiceId);
+        const project = projects.find(p => p.id === invoice?.projectId);
         
         return (
           payment.transactionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -641,6 +656,9 @@ function PaymentsContent() {
                     payment={payment}
                     onView={handleViewPayment}
                     isAdmin={isAdmin}
+                    buyers={buyers}
+                    projects={projects}
+                    units={units}
                   />
                 ))
               ) : (
@@ -806,17 +824,22 @@ export default function PaymentsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
+  }
+
+  
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
-
-  if (!session?.user) {
-    router.push('/login');
-    return null;
   }
 
   return (
