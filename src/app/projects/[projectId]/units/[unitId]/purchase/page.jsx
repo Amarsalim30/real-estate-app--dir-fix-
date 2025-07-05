@@ -8,6 +8,7 @@ import { useUnits } from '@/hooks/useUnits';
 import { usePaymentPlans } from '@/hooks/usePaymentsPlan';
 import { PaymentPlanCard } from '@/components/ui/expandableCard';
 import api from '@/lib/api';
+import { invoicesApi } from '@/lib/api/invoices';
 
 import {
   ArrowLeft,
@@ -312,12 +313,38 @@ const handleSubmit = async () => {
       };
     }
 
-    const response = await api.post(`/payments/unit/${unit.id}/purchase`, payload);
-
+ const response = await api.post(`/payments/unit/${unit.id}/purchase`, payload);
     const purchase = response.data;
-    console.log('Purchase submitted successfully:', purchase);
+    
+    // Check if invoice was created successfully
+    if (purchase.invoiceId) {
+      try {
+        // Verify the invoice success status
+const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
+  interval: 3000,    // every 3s
+  maxAttempts: 10,   // try for 30s total
+});
+        
+        if (success) {
+          // Redirect to success page with invoice ID
+          router.push(`/projects/${project.id}/units/${unit.id}/purchase/purchaseSuccess?invoiceId=${purchase.invoiceId}`);
+        } else {
+          // Handle unsuccessful payment
+          setErrors({
+            submit: 'Payment was not successful. Please try again or contact support.'
+          });
+        }
+      } catch (invoiceError) {
+        console.error('Error checking invoice status:', invoiceError);
+        // Still redirect but show a warning
+        // router.push(`/projects/${project.id}/units/${unit.id}/purchase/purchaseSuccess?invoiceId=${purchase.invoiceId}&warning=status_check_failed`);
+      }
+    } else {
+      setErrors({
+        submit: 'Purchase completed but no invoice was generated. Please contact support.'
+      });
+    }
 
-    router.push(`/projects/${project.id}/units/${unit.id}/purchase/purchaseSuccess`);
   } catch (error) {
     console.error('Purchase submission failed:', error);
     setErrors({

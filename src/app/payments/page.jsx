@@ -1,17 +1,13 @@
 'use client';
-import { useState, useMemo ,useEffect} from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 
-import {  PaymentMethods, PaymentStatuses } from '@/data/payments';
-// import { Invoices } from '@/data/invoices';
-// import { Units } from '@/data/units';
-// import { Buyers } from '@/data/buyers';
-// import { Projects } from '@/data/projects';
+import { PaymentMethods, PaymentStatuses } from '@/data/payments';
 
 import { usePayments } from '@/hooks/usePayments';
-import { useInvoices } from '@/hooks/useInvoices';
+import { useInvoices, useInvoice } from '@/hooks/useInvoices';
 import { useBuyers } from '@/hooks/useBuyers';
 import { useUnits } from '@/hooks/useUnits';
 import { useProjects } from '@/hooks/useProjects';
@@ -100,17 +96,32 @@ const PaymentMethodIcon = ({ method }) => {
       return <Building className="w-4 h-4 text-orange-600" />;
     case PaymentMethods.CASH:
       return <DollarSign className="w-4 h-4 text-yellow-600" />;
+    case PaymentMethods.MPESA_STKPUSH:
+      return <DollarSign className="w-4 h-4 text-green-600" />;
+    case PaymentMethods.MPESA_PAYBILL:
+      return <DollarSign className="w-4 h-4 text-green-600" />;
     default:
       return <CreditCard className="w-4 h-4 text-gray-600" />;
   }
 };
 
-const PaymentRow = ({ payment, onView, isAdmin,invoices,units,buyers,projects }) => {
-  
+const PaymentRow = ({ payment, onView, isAdmin, invoices, units, buyers, projects }) => {
+  // Early return if data not ready
+  if (!invoices || !units || !buyers || !projects) {
+    return (
+      <tr>
+        <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-4 text-center">
+          <div className="animate-pulse">Loading payment data...</div>
+        </td>
+      </tr>
+    );
+  }
+
+  // Find related data
   const invoice = invoices.find(i => i.id === payment.invoiceId);
   const unit = units.find(u => u.id === payment.unitId);
   const buyer = buyers.find(b => b.id === payment.buyerId);
-  const project = projects.find(p => p.id === invoice?.projectId);
+  const project = invoice ? projects.find(p => p.id === invoice.projectId) : null;
 
   return (
     <tr className="hover:bg-gray-50 border-b border-gray-200">
@@ -139,7 +150,7 @@ const PaymentRow = ({ payment, onView, isAdmin,invoices,units,buyers,projects })
                 {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
               </div>
               <div className="text-sm text-gray-500">
-                {buyer?.email}
+                {buyer?.email || 'N/A'}
               </div>
             </div>
           </div>
@@ -153,7 +164,7 @@ const PaymentRow = ({ payment, onView, isAdmin,invoices,units,buyers,projects })
         <div className="flex items-center mt-1">
           <PaymentMethodIcon method={payment.paymentMethod} />
           <span className="ml-2 text-sm text-gray-500 capitalize">
-            {payment.paymentMethod.replace('_', ' ')}
+            {payment?.paymentMethod?.replace('_', ' ') || '—'}
           </span>
         </div>
       </td>
@@ -198,15 +209,15 @@ const PaymentRow = ({ payment, onView, isAdmin,invoices,units,buyers,projects })
 };
 
 function PaymentsContent() {
-  const{buyers ,loading: buyersLoading } = useBuyers();
-  const {projects, loading: projectsLoading} = useProjects();
-  const {units, loading: unitsLoading} = useUnits();
-  const {invoices, loading: invoicesLoading} = useInvoices();
+  const { buyers, loading: buyersLoading } = useBuyers();
+  const { projects, loading: projectsLoading } = useProjects();
+  const { units, loading: unitsLoading } = useUnits();
+  const { invoices, loading: invoicesLoading } = useInvoices();
   const { payments, loading: paymentsLoading } = usePayments();
-
+  
   const { data: session } = useSession();
   const router = useRouter();
-
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -214,9 +225,10 @@ function PaymentsContent() {
   const [sortBy, setSortBy] = useState('paymentDate');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
+  const [errors, setErrors] = useState(null);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
-  
+
   // Get user's buyer ID - this could be from session or mapped from email/user ID
   const getUserBuyerId = () => {
     if (session?.user?.buyerId) {
@@ -224,14 +236,22 @@ function PaymentsContent() {
     }
     
     // Fallback: find buyer by email if buyerId not in session
-    const buyer = buyers.find(b => b.email === session?.user?.email);
-    return buyer?.id || null;
+    if (buyers && Array.isArray(buyers)) {
+      const buyer = buyers.find(b => b.email === session?.user?.email);
+      return buyer?.id || null;
+    }
+    
+    return null;
   };
+    const userBuyerId = getUserBuyerId();
 
-  const userBuyerId = getUserBuyerId();
 
   // Filter payments based on user role
   const getFilteredPayments = () => {
+    if (!payments || !Array.isArray(payments)) {
+      return [];
+    }
+    
     if (isAdmin) {
       return payments; // Admin sees all payments
     } else {
@@ -243,23 +263,26 @@ function PaymentsContent() {
     }
   };
 
-  // Filter and sort payments
+    // Filter and sort payments
   const filteredPayments = useMemo(() => {
-    let filtered = getFilteredPayments();
+      let filtered = getFilteredPayments();
 
+    if (!Array.isArray(filtered)) {
+      filtered = [];
+    }
     // Filter by search term
-    if (searchTerm) {
+    if (searchTerm && filtered.length > 0) {
       filtered = filtered.filter(payment => {
-        const buyer = buyers.find(b => b.id === payment.buyerId);
-        const unit = units.find(u => u.id === payment.unitId);
-        const invoice = invoices.find(i => i.id === payment.invoiceId);
-        const project = projects.find(p => p.id === invoice?.projectId);
+        const buyer = buyers?.find(b => b.id === payment.buyerId);
+        const unit = units?.find(u => u.id === payment.unitId);
+        const invoice = invoices?.find(i => i.id === payment.invoiceId);
+        const project = projects?.find(p => p.id === invoice?.projectId);
         
         return (
-          payment.transactionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (project && project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+          (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
       });
     }
@@ -299,41 +322,43 @@ function PaymentsContent() {
       );
     }
 
-    // Sort payments
-    filtered.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'transactionId':
-          aValue = a.transactionId;
-          bValue = b.transactionId;
-          break;
-        case 'amount':
-          aValue = a.amount;
-          bValue = b.amount;
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'paymentMethod':
-          aValue = a.paymentMethod;
-          bValue = b.paymentMethod;
-          break;
-        default:
-          aValue = new Date(a.paymentDate);
-          bValue = new Date(b.paymentDate);
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+    if (Array.isArray(filtered)) {
+      // Sort payments
+      filtered.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortBy) {
+          case 'transactionId':
+            aValue = a.transactionId;
+            bValue = b.transactionId;
+            break;
+          case 'amount':
+            aValue = a.amount;
+            bValue = b.amount;
+            break;
+          case 'status':
+            aValue = a.status;
+            bValue = b.status;
+            break;
+          case 'paymentMethod':
+            aValue = a.paymentMethod;
+            bValue = b.paymentMethod;
+            break;
+          default:
+            aValue = new Date(a.paymentDate);
+            bValue = new Date(b.paymentDate);
+        }
+        
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+    }
 
     return filtered;
-  }, [searchTerm, statusFilter, methodFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId]);
+  }, [payments, buyers, units, invoices, projects, searchTerm, statusFilter, methodFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -380,6 +405,34 @@ function PaymentsContent() {
     router.push(`/payments/${payment.id}`);
   };
 
+  const handleExportPDF = () => {
+    alert("Export PDF feature coming soon!");
+  };
+
+  const handleBulkExport = () => {
+    alert("Bulk export feature coming soon!");
+  };
+
+  const handleRetryFailed = () => {
+    if (confirm('Retry all failed payments?')) {
+      alert("Retry failed payments feature coming soon!");
+    }
+  };
+  
+  // Show loading state
+  const isLoading = paymentsLoading || buyersLoading || unitsLoading || invoicesLoading || projectsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Loading payments...</span>
+        </div>
+      </div>
+    );
+  }
+
   // Show message if user has no payments
   if (!isAdmin && !userBuyerId) {
     return (
@@ -405,7 +458,7 @@ function PaymentsContent() {
           </h1>
           <p className="text-gray-600">
             {isAdmin 
-                            ? 'Track and manage all payment transactions'
+              ? 'Track and manage all payment transactions'
               : 'View your payment history and transaction details'
             }
           </p>
@@ -535,6 +588,8 @@ function PaymentsContent() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Methods</option>
+                    <option value={PaymentMethods.MPESA_STKPUSH}>M-Pesa STK Push</option>
+                    <option value={PaymentMethods.MPESA_PAYBILL}>M-Pesa Paybill</option>
                     <option value={PaymentMethods.CREDIT_CARD}>Credit Card</option>
                     <option value={PaymentMethods.WIRE_TRANSFER}>Wire Transfer</option>
                     <option value={PaymentMethods.CHECK}>Check</option>
@@ -659,6 +714,7 @@ function PaymentsContent() {
                     buyers={buyers}
                     projects={projects}
                     units={units}
+                    invoices={invoices}
                   />
                 ))
               ) : (
@@ -712,7 +768,7 @@ function PaymentsContent() {
                     <div className="flex items-center space-x-3">
                       <PaymentMethodIcon method={method} />
                       <span className="text-sm font-medium text-gray-700 capitalize">
-                        {method.replace('_', ' ')}
+                        {method?.replace('_', ' ')|| '—'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -745,7 +801,7 @@ function PaymentsContent() {
                 .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
                 .slice(0, 5)
                 .map(payment => {
-                  const buyer = Buyers.find(b => b.id === payment.buyerId);
+                  const buyer = buyers.find(b => b.id === payment.buyerId);
                   return (
                     <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">

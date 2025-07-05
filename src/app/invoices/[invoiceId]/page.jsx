@@ -4,10 +4,6 @@ import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 import { InvoiceStatuses } from '@/data/invoices';
-// import { Buyers } from '@/data/buyers';
-// import { Units } from '@/data/units';
-// import { Projects } from '@/data/projects';
-// import { Payments } from '@/data/payments';
 
 import { useBuyers } from '@/hooks/useBuyers';
 import { useUnits } from '@/hooks/useUnits';
@@ -100,21 +96,17 @@ const CopyButton = ({ text, label }) => {
 
 function InvoiceDetailContent() {
   const { data: session } = useSession();
-  const {buyers: Buyers } = useBuyers();
-const {units: Units } = useUnits();
-const {projects: Projects } = useProjects();
-const {invoices: Invoices } = useInvoices();
-const {payments: Payments } = usePayments();
+  const { buyers: Buyers } = useBuyers();
+  const { units: Units } = useUnits();
+  const { projects: Projects } = useProjects();
+  const { invoices: Invoices } = useInvoices();
+  const { payments: Payments } = usePayments();
 
   const params = useParams();
   const router = useRouter();
-  var invoiceId='';
-
-  useEffect(() => {
-  if (!invoiceId || isNaN(invoiceId)) return;
-  invoiceId = parseInt(params.invoiceId);
-
-  }, [params.invoiceId, session]);
+  
+  // Fix: Properly initialize invoiceId
+  const invoiceId = params.invoiceId ? parseInt(params.invoiceId) : null;
 
   const [invoice, setInvoice] = useState(null);
   const [buyer, setBuyer] = useState(null);
@@ -122,6 +114,7 @@ const {payments: Payments } = usePayments();
   const [project, setProject] = useState(null);
   const [relatedPayments, setRelatedPayments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
@@ -137,23 +130,35 @@ const {payments: Payments } = usePayments();
 
   const userBuyerId = getUserBuyerId();
 
-useEffect(() => {
+  useEffect(() => {
     const fetchInvoiceData = () => {
       try {
+        setLoading(true);
+        setError(null);
+
+        // Fix: Check if invoiceId is valid first
+        if (!invoiceId || isNaN(invoiceId)) {
+          setError('Invalid invoice ID');
+          setLoading(false);
+          return;
+        }
+
         // Only proceed if all necessary data is available
         if (!Invoices || !Buyers || !Units || !Projects || !Payments) {
           return; // Still waiting for data to load
         }
 
         const foundInvoice = Invoices.find(i => i.id === invoiceId);
-        
+
         if (!foundInvoice) {
+          setError('Invoice not found');
           setLoading(false);
           return;
         }
 
         // Check access permissions for non-admin users
         if (!isAdmin && foundInvoice.buyerId !== userBuyerId) {
+          setError('Access denied');
           setLoading(false);
           return;
         }
@@ -177,12 +182,13 @@ useEffect(() => {
         setLoading(false);
       } catch (error) {
         console.error('Error fetching invoice data:', error);
+        setError('Failed to load invoice data');
         setLoading(false);
       }
     };
 
     fetchInvoiceData();
-  }, [invoiceId, isAdmin, userBuyerId, Invoices, Buyers, Units, Projects, Payments]); // Added data dependencies
+  }, [invoiceId, isAdmin, userBuyerId, Invoices, Buyers, Units, Projects, Payments]);
 
   const handleEdit = () => {
     router.push(`/invoices/${invoiceId}/edit`);
@@ -190,6 +196,7 @@ useEffect(() => {
 
   const handleDelete = () => {
     if (confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
+      // TODO: Implement actual delete functionality
       console.log('Delete invoice:', invoice);
       router.push('/invoices');
     }
@@ -200,11 +207,26 @@ useEffect(() => {
   };
 
   const handleDownloadPDF = () => {
-  alert("Download feature coming soon!");
+    alert("Download feature coming soon!");
   };
 
   const handlePayNow = () => {
     router.push(`/invoices/${invoiceId}/pay`);
+  };
+
+  const handleMarkAsPaid = () => {
+    if (confirm('Are you sure you want to mark this invoice as paid?')) {
+      // TODO: Implement mark as paid functionality
+      console.log('Mark as paid:', invoice);
+    }
+  };
+
+  const handleSendReminder = () => {
+    if (confirm('Send payment reminder to customer?')) {
+      // TODO: Implement send reminder functionality
+      console.log('Send reminder for invoice:', invoice);
+      alert('Payment reminder sent successfully!');
+    }
   };
 
   if (loading) {
@@ -215,17 +237,21 @@ useEffect(() => {
     );
   }
 
-  if (!invoice) {
+  if (error || !invoice) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {!isAdmin && userBuyerId ? 'Access Denied' : 'Invoice Not Found'}
+            {error === 'Access denied' ? 'Access Denied' : 
+             error === 'Invalid invoice ID' ? 'Invalid Invoice' :
+             'Invoice Not Found'}
           </h2>
           <p className="text-gray-600 mb-4">
-            {!isAdmin && userBuyerId 
+            {error === 'Access denied' 
               ? 'You don\'t have permission to view this invoice.'
+              : error === 'Invalid invoice ID'
+              ? 'The invoice ID provided is not valid.'
               : 'The invoice you\'re looking for doesn\'t exist.'
             }
           </p>
@@ -260,7 +286,6 @@ useEffect(() => {
             <h1 className="text-3xl font-bold text-gray-900">
               {isAdmin ? 'Invoice Details' : 'Your Invoice'}
             </h1>
-            {console.log("invoice.invoiceNumber:", invoice)}
             <p className="text-gray-600">Invoice #{invoice.id}</p>
           </div>
         </div>
@@ -303,7 +328,8 @@ useEffect(() => {
           )}
         </div>
       </div>
-                {/* Overdue Alert for Users */}
+
+      {/* Overdue Alert for Users */}
       {!isAdmin && isOverdue && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
           <div className="flex items-start space-x-3">
@@ -339,8 +365,8 @@ useEffect(() => {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Invoice Number</label>
                 <div className="flex items-center">
-                  <p className="text-lg font-semibold text-gray-900">{invoice.id}</p>
-                  <CopyButton text={invoice.id} label="invoice number" />
+                  <p className="text-lg font-semibold text-gray-900">#{invoice.id}</p>
+                  <CopyButton text={invoice.id.toString()} label="invoice number" />
                 </div>
               </div>
 

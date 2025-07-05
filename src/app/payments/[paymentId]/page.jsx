@@ -3,11 +3,19 @@ import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Payments } from '@/data/payments';
-import { Buyers } from '@/data/buyers';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
-import { Invoices } from '@/data/invoices';
+
+// import { Payments } from '@/data/payments';
+// import { Buyers } from '@/data/buyers';
+// import { Units } from '@/data/units';
+// import { Projects } from '@/data/projects';
+// import { Invoices } from '@/data/invoices';
+
+import { usePayments } from '@/hooks/usePayments';
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
+import { useInvoices } from '@/hooks/useInvoices';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
@@ -119,6 +127,13 @@ function PaymentDetailContent() {
   const params = useParams();
   const router = useRouter();
   const paymentId = parseInt(params.paymentId);
+
+  const { payments:Payments}= usePayments();
+  const { buyers: Buyers } = useBuyers();
+  const { units: Units } = useUnits();
+  const { projects: Projects } = useProjects();
+  const { invoices: Invoices } = useInvoices();
+
 
   const [payment, setPayment] = useState(null);
   const [buyer, setBuyer] = useState(null);
@@ -330,8 +345,8 @@ function PaymentDetailContent() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Payment Number</label>
                 <div className="flex items-center">
-                  <p className="text-lg font-semibold text-gray-900">{payment.paymentNumber}</p>
-                  <CopyButton text={payment.paymentNumber} label="payment number" />
+                  <p className="text-lg font-semibold text-gray-900">{payment.id}</p>
+                  <CopyButton text={payment.id} label="payment number" />
                 </div>
               </div>
 
@@ -800,7 +815,7 @@ function PaymentDetailContent() {
           <div className="mt-4 pt-4 border-t border-blue-200">
             <p className="text-sm text-blue-700">
               <strong>Payment Issues:</strong> If you have questions about this payment or need to request a refund, 
-              please contact our support team with your payment number: <strong>{payment.paymentNumber}</strong>
+              please contact our support team with your payment number: <strong>{payment.id}</strong>
             </p>
           </div>
         </div>

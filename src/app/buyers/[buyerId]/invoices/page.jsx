@@ -5,8 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 
 
-// import { Buyers } from '@/data/buyers';
-// import { Invoices, InvoiceStatuses } from '@/data/invoices';
+import { InvoiceStatuses } from '@/data/invoices';
 // import { Payments } from '@/data/payments';
 // import { Units } from '@/data/units';
 // import { Projects } from '@/data/projects';
@@ -89,9 +88,31 @@ const StatusBadge = ({ status }) => {
 };
 
 const InvoiceRow = ({ invoice, onView ,Units , Projects, Payments }) => {
+if (!Units || !Projects || !Payments) {
+    return (
+      <tr className="hover:bg-gray-50 border-b border-gray-200">
+        <td colSpan="7" className="px-6 py-4 text-center text-gray-600">
+          Loading invoice data...
+        </td>
+      </tr>
+    );
+  }
+
   const unit = Units.find(u => u.id === invoice.unitId);
   const project = Projects.find(p => p.id === invoice.projectId);
   const payments = Payments.filter(p => p.invoiceId === invoice.id);
+  
+  // Add validation for missing related data
+  if (!unit || !project) {
+    return (
+      <tr className="hover:bg-gray-50 border-b border-gray-200">
+        <td colSpan="7" className="px-6 py-4 text-center text-red-600">
+          Missing data for invoice {invoice.invoiceNumber}
+        </td>
+      </tr>
+    );
+  }
+
   const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
   const remaining = invoice.totalAmount - totalPaid;
 
@@ -194,10 +215,10 @@ function BuyerInvoicesContent() {
   const buyerId = parseInt(params.buyerId);
   const {buyer} = useBuyer(buyerId);
 
-  const {invoices:Invoices} = useInvoices();
-  const {payments:Payments} = usePayments();
-  const {units:Units} = useUnits();
-  const {projects:Projects} = useProjects();
+  const {invoices: Invoices, loading: invoicesLoading} = useInvoices();
+  const {payments: Payments, loading: paymentsLoading} = usePayments();
+  const {units: Units, loading: unitsLoading} = useUnits();
+  const {projects: Projects, loading: projectsLoading} = useProjects();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -207,89 +228,125 @@ function BuyerInvoicesContent() {
   const [showFilters, setShowFilters] = useState(false);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
+    const buyerInvoices = Invoices.filter(invoice => invoice.buyerId === buyerId);
 
-  // Get buyer's invoices
-  const buyerInvoices = Invoices.filter(invoice => invoice.buyerId === buyerId);
+
+  // // FIRST: Check if data is still loading
+  // if (invoicesLoading || paymentsLoading || unitsLoading || projectsLoading) {
+  //   return (
+  //     <div className="p-6">
+  //       <div className="flex items-center justify-center py-12">
+  //         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+  //         <span className="ml-3 text-gray-600">Loading invoices...</span>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
+  // // SECOND: Check if data failed to load (only after loading is complete)
+  // if (!Invoices || !Payments || !Units || !Projects) {
+  //   return (
+  //     <div className="p-6">
+  //       <div className="text-center py-12">
+  //         <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+  //         <h3 className="text-lg font-medium text-gray-900 mb-2">Data Loading Error</h3>
+  //         <p className="text-gray-600">Unable to load invoice data. Please refresh the page.</p>
+  //         <button 
+  //           onClick={() => window.location.reload()} 
+  //           className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+  //         >
+  //           Refresh Page
+  //         </button>
+  //       </div>
+  //     </div>
+  //   );
+  // }
+
+  // Get buyer's invoices - add safety check
 
 
     // Filter and sort invoices
   const filteredInvoices = useMemo(() => {
+      if (!buyerInvoices || !Array.isArray(buyerInvoices)) {
+    return [];
+  }
     let filtered = buyerInvoices;
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(invoice => {
-        const unit = Units.find(u => u.id === invoice.unitId);
-        const project = Projects.find(p => p.id === invoice.projectId);
-        
-        return (
-          invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (project && project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      });
-    }
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(invoice => {
-        if (statusFilter === 'overdue') {
-          return invoice.status === InvoiceStatuses.PENDING && 
-                 new Date(invoice.dueDate) < new Date();
-        }
-        return invoice.status === statusFilter;
-      });
-    }
-
-    // Filter by date range
-    if (dateRange !== 'all') {
-      const now = new Date();
-      const filterDate = new Date();
+  // Filter by search term
+  if (searchTerm && filtered.length > 0) {
+    filtered = filtered.filter(invoice => {
+      const unit = Units?.find(u => u.id === invoice.unitId);
+      const project = Projects?.find(p => p.id === invoice.projectId);
       
-      switch (dateRange) {
-        case '7days':
-          filterDate.setDate(now.getDate() - 7);
-          break;
-        case '30days':
-          filterDate.setDate(now.getDate() - 30);
-          break;
-        case '90days':
-          filterDate.setDate(now.getDate() - 90);
-          break;
-        case '1year':
-          filterDate.setFullYear(now.getFullYear() - 1);
-          break;
-      }
-      
-      filtered = filtered.filter(invoice => 
-        new Date(invoice.issueDate) >= filterDate
+      return (
+        invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
       );
-    }
+    });
+  }
 
-    // Sort invoices
+  // Filter by status
+  if (statusFilter !== 'all' && filtered.length > 0) {
+    filtered = filtered.filter(invoice => {
+      if (statusFilter === 'overdue') {
+        return invoice.status === InvoiceStatuses.PENDING && 
+               new Date(invoice.dueDate) < new Date();
+      }
+      return invoice.status === statusFilter;
+    });
+  }
+
+  // Filter by date range
+  if (dateRange !== 'all' && filtered.length > 0) {
+    const now = new Date();
+    const filterDate = new Date();
+    
+    switch (dateRange) {
+      case '7days':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case '30days':
+        filterDate.setDate(now.getDate() - 30);
+        break;
+      case '90days':
+        filterDate.setDate(now.getDate() - 90);
+        break;
+      case '1year':
+        filterDate.setFullYear(now.getFullYear() - 1);
+        break;
+    }
+    
+    filtered = filtered.filter(invoice => 
+      new Date(invoice.issueDate) >= filterDate
+    );
+  }
+
+  // Sort invoices - ensure we still have an array
+  if (Array.isArray(filtered) && filtered.length > 0) {
     filtered.sort((a, b) => {
       let aValue, bValue;
       
       switch (sortBy) {
         case 'invoiceNumber':
-          aValue = a.invoiceNumber;
-          bValue = b.invoiceNumber;
+          aValue = a.invoiceNumber || '';
+          bValue = b.invoiceNumber || '';
           break;
         case 'totalAmount':
-          aValue = a.totalAmount;
-          bValue = b.totalAmount;
+          aValue = a.totalAmount || 0;
+          bValue = b.totalAmount || 0;
           break;
         case 'dueDate':
-          aValue = new Date(a.dueDate);
-          bValue = new Date(b.dueDate);
+          aValue = new Date(a.dueDate || 0);
+          bValue = new Date(b.dueDate || 0);
           break;
         case 'status':
-          aValue = a.status;
-          bValue = b.status;
+          aValue = a.status || '';
+          bValue = b.status || '';
           break;
         default:
-          aValue = new Date(a.issueDate);
-          bValue = new Date(b.issueDate);
+          aValue = new Date(a.issueDate || 0);
+          bValue = new Date(b.issueDate || 0);
       }
       
       if (sortOrder === 'asc') {
@@ -298,48 +355,52 @@ function BuyerInvoicesContent() {
         return aValue < bValue ? 1 : -1;
       }
     });
+  }
 
-    return filtered;
-  }, [buyerInvoices, searchTerm, statusFilter, dateRange, sortBy, sortOrder]);
+  return filtered;
+}, [buyerInvoices, searchTerm, statusFilter, dateRange, sortBy, sortOrder, Units, Projects]);
 
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const total = filteredInvoices.length;
-    const paid = filteredInvoices.filter(i => i.status === InvoiceStatuses.PAID).length;
-    const pending = filteredInvoices.filter(i => i.status === InvoiceStatuses.PENDING).length;
-    const overdue = filteredInvoices.filter(i => 
-      i.status === InvoiceStatuses.PENDING && new Date(i.dueDate) < new Date()
-    ).length;
-    const cancelled = filteredInvoices.filter(i => i.status === InvoiceStatuses.CANCELLED).length;
-    
-    const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const paidAmount = filteredInvoices
-      .filter(i => i.status === InvoiceStatuses.PAID)
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
-    const pendingAmount = filteredInvoices
-      .filter(i => i.status === InvoiceStatuses.PENDING)
-      .reduce((sum, invoice) => sum + invoice.totalAmount, 0);
 
-    // Calculate total paid across all invoices (including partial payments)
-    const allPayments = Payments.filter(p => 
-      filteredInvoices.some(inv => inv.id === p.invoiceId)
-    );
-    const totalPaidAmount = allPayments.reduce((sum, payment) => sum + payment.amount, 0);
-    const outstandingAmount = totalAmount - totalPaidAmount;
-
+// Calculate summary statistics
+const summaryStats = useMemo(() => {
+  // Safety check
+  if (!Array.isArray(filteredInvoices) || !Array.isArray(Payments)) {
     return {
-      total,
-      paid,
-      pending,
-      overdue,
-      cancelled,
-      totalAmount,
-      paidAmount,
-      pendingAmount,
-      totalPaidAmount,
-      outstandingAmount
+      total: 0, paid: 0, pending: 0, overdue: 0, cancelled: 0,
+      totalAmount: 0, paidAmount: 0, pendingAmount: 0,
+      totalPaidAmount: 0, outstandingAmount: 0
     };
-  }, [filteredInvoices]);
+  }
+
+  const total = filteredInvoices.length;
+  const paid = filteredInvoices.filter(i => i.status === InvoiceStatuses.PAID).length;
+  const pending = filteredInvoices.filter(i => i.status === InvoiceStatuses.PENDING).length;
+  const overdue = filteredInvoices.filter(i => 
+    i.status === InvoiceStatuses.PENDING && new Date(i.dueDate) < new Date()
+  ).length;
+  const cancelled = filteredInvoices.filter(i => i.status === InvoiceStatuses.CANCELLED).length;
+  
+  const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
+  const paidAmount = filteredInvoices
+    .filter(i => i.status === InvoiceStatuses.PAID)
+    .reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
+  const pendingAmount = filteredInvoices
+    .filter(i => i.status === InvoiceStatuses.PENDING)
+    .reduce((sum, invoice) => sum + (invoice.totalAmount || 0), 0);
+
+  // Calculate total paid across all invoices (including partial payments)
+  const allPayments = Payments.filter(p => 
+    filteredInvoices.some(inv => inv.id === p.invoiceId)
+  );
+  const totalPaidAmount = allPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const outstandingAmount = totalAmount - totalPaidAmount;
+
+  return {
+    total, paid, pending, overdue, cancelled,
+    totalAmount, paidAmount, pendingAmount,
+    totalPaidAmount, outstandingAmount
+  };
+}, [filteredInvoices, Payments]);
 
 
   if (!buyer) {

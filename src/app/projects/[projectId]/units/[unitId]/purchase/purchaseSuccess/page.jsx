@@ -1,7 +1,12 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
+
+// import { Projects } from '@/data/projects';
+// import { Units } from '@/data/units';
+
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+
 import { useSession } from 'next-auth/react';
 import Header from '@/components/layout/header';
 import { formatPrice } from '@/utils/format';
@@ -11,6 +16,7 @@ import {
   Calendar, 
   Phone, 
   Mail, 
+  ArrowLeft,
   Home,
   FileText,
   CreditCard,
@@ -21,6 +27,8 @@ export default function PurchaseSuccessPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
+  const {projects:Projects} =useProjects();
+  const {units:Units} =useUnits();
 
   const unit = Array.isArray(Units) ? Units.find(u => u.id === parseInt(params.unitId)) : null;
   const project = Array.isArray(Projects) ? Projects.find(p => p.id === parseInt(params.projectId)) : null;
@@ -43,7 +51,13 @@ export default function PurchaseSuccessPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header session={session} />
+      <button
+            onClick={() => router.push(`/dashboard`)}
+            className="flex items-center p-1.5 text-gray-500 hover:text-gray-700 transition-colors mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span className="text-sm sm:text-base">Back to Dashboard</span>
+          </button>
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Success Header */}
@@ -76,27 +90,27 @@ export default function PurchaseSuccessPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Unit:</span>
-                      <span className="font-medium">Unit {unit.unitNumber}</span>
+                      <span className="font-medium text-gray-700">Unit {unit.unitNumber}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Project:</span>
-                      <span className="font-medium">{project.name}</span>
+                      <span className="font-medium text-gray-700">{project.name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Location:</span>
-                      <span className="font-medium">{project.location}</span>
+                      <span className="font-medium text-gray-700">{project.location}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Size:</span>
-                      <span className="font-medium">{unit.sqft?.toLocaleString()} sq ft</span>
+                      <span className="font-medium text-gray-700">{unit.sqft?.toLocaleString()} sq ft</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Bedrooms:</span>
-                      <span className="font-medium">{unit.bedrooms}</span>
+                      <span className="font-medium text-gray-700">{unit.bedrooms}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Bathrooms:</span>
-                      <span className="font-medium">{unit.bathrooms}</span>
+                      <span className="font-medium text-gray-700">{unit.bathrooms}</span>
                     </div>
                   </div>
                 </div>
@@ -106,15 +120,15 @@ export default function PurchaseSuccessPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Purchase Price:</span>
-                      <span className="font-medium">{formatPrice(unit.price)}</span>
+                      <span className="font-medium text-gray-700">{formatPrice(unit.price)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Est. Taxes & Fees:</span>
-                      <span className="font-medium">{formatPrice(unit.price * 0.08)}</span>
+                      <span className="font-medium text-gray-700">{formatPrice(unit.price * 0.08)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Processing Fee:</span>
-                      <span className="font-medium">$500</span>
+                      <span className="font-medium text-gray-700">$500</span>
                     </div>
                     <div className="border-t pt-3 flex justify-between">
                       <span className="font-semibold text-gray-900">Total Amount:</span>
@@ -124,11 +138,11 @@ export default function PurchaseSuccessPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Purchase Date:</span>
-                      <span className="font-medium">{purchaseDate}</span>
+                      <span className="font-medium text-gray-700">{purchaseDate}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Est. Closing:</span>
-                      <span className="font-medium">{estimatedClosingDate}</span>
+                      <span className="font-medium text-gray-700">{estimatedClosingDate}</span>
                     </div>
                   </div>
                 </div>

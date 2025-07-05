@@ -16,5 +16,6 @@
       "createTheme(?:<\\w+>)?\\s*\\(([^)]*)\\)",
       "{?\\s?[\\w].*:\\s*?[\"'`]([^\"'`]*).*?,?\\s?}?"
     ]
-  ]
+  ],
+  "CodeGPT.apiKey": "CodeGPT Plus Beta"
 }

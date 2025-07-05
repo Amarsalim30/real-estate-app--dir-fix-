@@ -93,6 +93,15 @@ export const invoicesApi = {
     }
   },
 
+   hasSuccess: async (invoiceId) => {
+    try {
+      const response = await api.get(`/invoices/${invoiceId}/has-success`);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to check invoice success status');
+    }
+  },
+
   // Get overdue invoices
   getOverdue: async (params = {}) => {
     try {
@@ -101,5 +110,32 @@ export const invoicesApi = {
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch overdue invoices');
     }
+  },
+  hasSuccessWithRetry: async (
+  invoiceId,
+  {
+    interval = 3000,    // 3 seconds
+    maxAttempts = 10,   // stop after 10 tries
+  } = {}
+) => {
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    try {
+      const response = await api.get(`/invoices/${invoiceId}/has-success`);
+      if (response.data === true) {
+        return true; // success
+      }
+    } catch (error) {
+      console.warn(`Attempt ${attempts + 1} failed:`, error.message);
+    }
+
+    await new Promise((res) => setTimeout(res, interval));
+    attempts++;
   }
+
+  return false; // Timed out or never succeeded
+}
+
+
 };
