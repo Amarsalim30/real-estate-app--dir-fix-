@@ -1,13 +1,16 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Payments, PaymentMethods, PaymentStatuses } from '@/data/payments';
-import { Invoices } from '@/data/invoices';
-import { Units } from '@/data/units';
-import { Buyers } from '@/data/buyers';
-import { Projects } from '@/data/projects';
+
+import { PaymentMethods, PaymentStatuses } from '@/data/payments';
+
+import { usePayments } from '@/hooks/usePayments';
+import { useInvoices, useInvoice } from '@/hooks/useInvoices';
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import { 
@@ -93,16 +96,32 @@ const PaymentMethodIcon = ({ method }) => {
       return <Building className="w-4 h-4 text-orange-600" />;
     case PaymentMethods.CASH:
       return <DollarSign className="w-4 h-4 text-yellow-600" />;
+    case PaymentMethods.MPESA_STKPUSH:
+      return <DollarSign className="w-4 h-4 text-green-600" />;
+    case PaymentMethods.MPESA_PAYBILL:
+      return <DollarSign className="w-4 h-4 text-green-600" />;
     default:
       return <CreditCard className="w-4 h-4 text-gray-600" />;
   }
 };
 
-const PaymentRow = ({ payment, onView }) => {
-  const invoice = Invoices.find(i => i.id === payment.invoiceId);
-  const unit = Units.find(u => u.id === payment.unitId);
-  const buyer = Buyers.find(b => b.id === payment.buyerId);
-  const project = Projects.find(p => p.id === invoice?.projectId);
+const PaymentRow = ({ payment, onView, isAdmin, invoices, units, buyers, projects }) => {
+  // Early return if data not ready
+  if (!invoices || !units || !buyers || !projects) {
+    return (
+      <tr>
+        <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-4 text-center">
+          <div className="animate-pulse">Loading payment data...</div>
+        </td>
+      </tr>
+    );
+  }
+
+  // Find related data
+  const invoice = invoices.find(i => i.id === payment.invoiceId);
+  const unit = units.find(u => u.id === payment.unitId);
+  const buyer = buyers.find(b => b.id === payment.buyerId);
+  const project = invoice ? projects.find(p => p.id === invoice.projectId) : null;
 
   return (
     <tr className="hover:bg-gray-50 border-b border-gray-200">
@@ -120,21 +139,23 @@ const PaymentRow = ({ payment, onView }) => {
         </div>
       </td>
       
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-            <User className="w-4 h-4 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
+      {isAdmin && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+              <User className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-sm text-gray-500">
-              {buyer?.email}
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
+              </div>
+              <div className="text-sm text-gray-500">
+                {buyer?.email || 'N/A'}
+              </div>
             </div>
           </div>
-        </div>
-      </td>
+        </td>
+      )}
       
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="text-sm font-medium text-gray-900">
@@ -143,7 +164,7 @@ const PaymentRow = ({ payment, onView }) => {
         <div className="flex items-center mt-1">
           <PaymentMethodIcon method={payment.paymentMethod} />
           <span className="ml-2 text-sm text-gray-500 capitalize">
-            {payment.paymentMethod.replace('_', ' ')}
+            {payment?.paymentMethod?.replace('_', ' ') || '—'}
           </span>
         </div>
       </td>
@@ -188,8 +209,15 @@ const PaymentRow = ({ payment, onView }) => {
 };
 
 function PaymentsContent() {
+  const { buyers, loading: buyersLoading } = useBuyers();
+  const { projects, loading: projectsLoading } = useProjects();
+  const { units, loading: unitsLoading } = useUnits();
+  const { invoices, loading: invoicesLoading } = useInvoices();
+  const { payments, loading: paymentsLoading } = usePayments();
+  
   const { data: session } = useSession();
-    const router = useRouter();
+  const router = useRouter();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [methodFilter, setMethodFilter] = useState('all');
@@ -197,26 +225,64 @@ function PaymentsContent() {
   const [sortBy, setSortBy] = useState('paymentDate');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
+  const [errors, setErrors] = useState(null);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
-  // Filter and sort payments
-  const filteredPayments = useMemo(() => {
-    let filtered = Payments;
+  // Get user's buyer ID - this could be from session or mapped from email/user ID
+  const getUserBuyerId = () => {
+    if (session?.user?.buyerId) {
+      return session.user.buyerId;
+    }
+    
+    // Fallback: find buyer by email if buyerId not in session
+    if (buyers && Array.isArray(buyers)) {
+      const buyer = buyers.find(b => b.email === session?.user?.email);
+      return buyer?.id || null;
+    }
+    
+    return null;
+  };
+    const userBuyerId = getUserBuyerId();
 
+
+  // Filter payments based on user role
+  const getFilteredPayments = () => {
+    if (!payments || !Array.isArray(payments)) {
+      return [];
+    }
+    
+    if (isAdmin) {
+      return payments; // Admin sees all payments
+    } else {
+      // Non-admin users see only their own payments
+      if (!userBuyerId) {
+        return []; // No payments if user not linked to a buyer
+      }
+      return payments.filter(payment => payment.buyerId === userBuyerId);
+    }
+  };
+
+    // Filter and sort payments
+  const filteredPayments = useMemo(() => {
+      let filtered = getFilteredPayments();
+
+    if (!Array.isArray(filtered)) {
+      filtered = [];
+    }
     // Filter by search term
-    if (searchTerm) {
+    if (searchTerm && filtered.length > 0) {
       filtered = filtered.filter(payment => {
-        const buyer = Buyers.find(b => b.id === payment.buyerId);
-        const unit = Units.find(u => u.id === payment.unitId);
-        const invoice = Invoices.find(i => i.id === payment.invoiceId);
-        const project = Projects.find(p => p.id === invoice?.projectId);
+        const buyer = buyers?.find(b => b.id === payment.buyerId);
+        const unit = units?.find(u => u.id === payment.unitId);
+        const invoice = invoices?.find(i => i.id === payment.invoiceId);
+        const project = projects?.find(p => p.id === invoice?.projectId);
         
         return (
-          payment.transactionId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          payment.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (project && project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()))
+          (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
         );
       });
     }
@@ -256,41 +322,43 @@ function PaymentsContent() {
       );
     }
 
-    // Sort payments
-    filtered.sort((a, b) => {
-      let aValue, bValue;
-      
-      switch (sortBy) {
-        case 'transactionId':
-          aValue = a.transactionId;
-          bValue = b.transactionId;
-          break;
-        case 'amount':
-          aValue = a.amount;
-          bValue = b.amount;
-          break;
-        case 'status':
-          aValue = a.status;
-          bValue = b.status;
-          break;
-        case 'paymentMethod':
-          aValue = a.paymentMethod;
-          bValue = b.paymentMethod;
-          break;
-        default:
-          aValue = new Date(a.paymentDate);
-          bValue = new Date(b.paymentDate);
-      }
-      
-      if (sortOrder === 'asc') {
-        return aValue > bValue ? 1 : -1;
-      } else {
-        return aValue < bValue ? 1 : -1;
-      }
-    });
+    if (Array.isArray(filtered)) {
+      // Sort payments
+      filtered.sort((a, b) => {
+        let aValue, bValue;
+        
+        switch (sortBy) {
+          case 'transactionId':
+            aValue = a.transactionId;
+            bValue = b.transactionId;
+            break;
+          case 'amount':
+            aValue = a.amount;
+            bValue = b.amount;
+            break;
+          case 'status':
+            aValue = a.status;
+            bValue = b.status;
+            break;
+          case 'paymentMethod':
+            aValue = a.paymentMethod;
+            bValue = b.paymentMethod;
+            break;
+          default:
+            aValue = new Date(a.paymentDate);
+            bValue = new Date(b.paymentDate);
+        }
+        
+        if (sortOrder === 'asc') {
+          return aValue > bValue ? 1 : -1;
+        } else {
+          return aValue < bValue ? 1 : -1;
+        }
+      });
+    }
 
     return filtered;
-  }, [searchTerm, statusFilter, methodFilter, dateRange, sortBy, sortOrder]);
+  }, [payments, buyers, units, invoices, projects, searchTerm, statusFilter, methodFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -337,13 +405,63 @@ function PaymentsContent() {
     router.push(`/payments/${payment.id}`);
   };
 
+  const handleExportPDF = () => {
+    alert("Export PDF feature coming soon!");
+  };
+
+  const handleBulkExport = () => {
+    alert("Bulk export feature coming soon!");
+  };
+
+  const handleRetryFailed = () => {
+    if (confirm('Retry all failed payments?')) {
+      alert("Retry failed payments feature coming soon!");
+    }
+  };
+  
+  // Show loading state
+  const isLoading = paymentsLoading || buyersLoading || unitsLoading || invoicesLoading || projectsLoading;
+
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Loading payments...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if user has no payments
+  if (!isAdmin && !userBuyerId) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-12">
+          <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Payment Access</h3>
+          <p className="text-gray-600">
+            Your account is not linked to any buyer records. Please contact support for assistance.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Payments</h1>
-          <p className="text-gray-600">Track and manage all payment transactions</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isAdmin ? 'Payments' : 'Your Payments'}
+          </h1>
+          <p className="text-gray-600">
+            {isAdmin 
+              ? 'Track and manage all payment transactions'
+              : 'View your payment history and transaction details'
+            }
+          </p>
         </div>
         
         {isAdmin && (
@@ -406,7 +524,9 @@ function PaymentsContent() {
             </div>
             <AlertTriangle className="w-8 h-8 text-red-600" />
           </div>
-          <p className="text-sm text-red-600 mt-2">Requires attention</p>
+          <p className="text-sm text-red-600 mt-2">
+            {summaryStats.failed > 0 ? 'Requires attention' : 'All good'}
+          </p>
         </div>
       </div>
 
@@ -419,7 +539,7 @@ function PaymentsContent() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search payments..."
+                placeholder={isAdmin ? "Search payments..." : "Search your payments..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -468,6 +588,8 @@ function PaymentsContent() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Methods</option>
+                    <option value={PaymentMethods.MPESA_STKPUSH}>M-Pesa STK Push</option>
+                    <option value={PaymentMethods.MPESA_PAYBILL}>M-Pesa Paybill</option>
                     <option value={PaymentMethods.CREDIT_CARD}>Credit Card</option>
                     <option value={PaymentMethods.WIRE_TRANSFER}>Wire Transfer</option>
                     <option value={PaymentMethods.CHECK}>Check</option>
@@ -524,7 +646,7 @@ function PaymentsContent() {
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {filteredPayments.length} of {Payments.length} payments
+              Showing {filteredPayments.length} of {getFilteredPayments().length} payments
             </span>
             <div className="flex items-center space-x-4">
               <span>Completed: {summaryStats.completed}</span>
@@ -532,8 +654,7 @@ function PaymentsContent() {
               <span>Failed: {summaryStats.failed}</span>
             </div>
           </div>
-          {/* see here */}
-                  </div>
+        </div>
       </div>
 
       {/* Payments Table */}
@@ -551,9 +672,11 @@ function PaymentsContent() {
                     <ArrowUpDown className="w-4 h-4 ml-1" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
+                {isAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                )}
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('amount')}
@@ -587,17 +710,26 @@ function PaymentsContent() {
                     key={payment.id}
                     payment={payment}
                     onView={handleViewPayment}
+                    isAdmin={isAdmin}
+                    buyers={buyers}
+                    projects={projects}
+                    units={units}
+                    invoices={invoices}
                   />
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
+                  <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-12 text-center">
                     <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Payments Found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      {isAdmin ? 'No Payments Found' : 'No Payments Yet'}
+                    </h3>
                     <p className="text-gray-600 mb-6">
                       {searchTerm || statusFilter !== 'all' || methodFilter !== 'all' || dateRange !== 'all'
-                        ? 'No payments match your current filters.'
-                        : 'Payment transactions will appear here once recorded.'
+                        ? `No payments match your current filters.`
+                        : isAdmin 
+                          ? 'Payment transactions will appear here once recorded.'
+                          : 'Your payment transactions will appear here once you make payments.'
                       }
                     </p>
                     {(!searchTerm && statusFilter === 'all' && methodFilter === 'all' && dateRange === 'all' && isAdmin) && (
@@ -617,7 +749,7 @@ function PaymentsContent() {
         </div>
       </div>
 
-      {/* Payment Method Distribution */}
+      {/* Payment Method Distribution - Only show if there are payments */}
       {filteredPayments.length > 0 && (
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Payment Methods Chart */}
@@ -629,12 +761,14 @@ function PaymentsContent() {
                 const methodAmount = methodPayments.reduce((sum, p) => sum + p.amount, 0);
                 const percentage = summaryStats.totalAmount > 0 ? (methodAmount / summaryStats.totalAmount) * 100 : 0;
                 
+                if (methodPayments.length === 0) return null;
+                
                 return (
                   <div key={method} className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <PaymentMethodIcon method={method} />
                       <span className="text-sm font-medium text-gray-700 capitalize">
-                        {method.replace('_', ' ')}
+                        {method?.replace('_', ' ')|| '—'}
                       </span>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -667,7 +801,7 @@ function PaymentsContent() {
                 .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
                 .slice(0, 5)
                 .map(payment => {
-                  const buyer = Buyers.find(b => b.id === payment.buyerId);
+                  const buyer = buyers.find(b => b.id === payment.buyerId);
                   return (
                     <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center space-x-3">
@@ -676,7 +810,10 @@ function PaymentsContent() {
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">
-                            {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown'}
+                            {isAdmin 
+                              ? (buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown')
+                              : `Payment ${payment.transactionId.slice(-6)}`
+                            }
                           </p>
                           <p className="text-xs text-gray-600">
                             {new Date(payment.paymentDate).toLocaleDateString()}
@@ -697,7 +834,7 @@ function PaymentsContent() {
         </div>
       )}
 
-      {/* Bulk Actions */}
+      {/* Bulk Actions - Admin Only */}
       {isAdmin && filteredPayments.length > 0 && (
         <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
@@ -722,6 +859,19 @@ function PaymentsContent() {
           </div>
         </div>
       )}
+
+      {/* User-specific Export - Non-Admin Only */}
+      {!isAdmin && filteredPayments.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Export your payment history:</span>
+            <button className="flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -730,17 +880,22 @@ export default function PaymentsPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
+  }
+
+  
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
       </div>
     );
-  }
-
-  if (!session?.user) {
-    router.push('/login');
-    return null;
   }
 
   return (

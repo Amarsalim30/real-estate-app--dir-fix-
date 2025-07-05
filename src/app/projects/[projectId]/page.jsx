@@ -1,9 +1,13 @@
 'use client';
 import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
-import { formatPrice } from '@/utils/format';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits'; import { formatPrice } from '@/utils/format';
+import { ConstructionStages, getConstructionStageColor, getConstructionProgressPercentage } from '@/lib/constructionStages';
+import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import BookVisitModal from '@/components/ui/BookingVisit'
+import Image from 'next/image';
+
 import {
   ArrowLeft,
   MapPin,
@@ -25,22 +29,166 @@ import {
   Bed,
   Bath,
   Square,
-  DollarSign
+  DollarSign,
+  Award,
+  Wrench,
+  TrendingUp,
+  Navigation,
+  Book
 } from 'lucide-react';
+
+// Google Maps configuration
+const mapContainerStyle = {
+  width: '100%',
+  height: '400px',
+  borderRadius: '0.5rem'
+};
+
+const defaultCenter = {
+  lat: -1.2921, // Default to Nairobi, Kenya
+  lng: 36.8219,
+};
+
+// Google Maps component
+function ProjectMap({ project }) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  });
+
+  const center = useMemo(() => {
+    if (project?.latitude && project?.longitude) {
+      return {
+        lat: parseFloat(project.latitude),
+        lng: parseFloat(project.longitude),
+      };
+    }
+    return defaultCenter;
+  }, [project]);
+
+  if (loadError) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <MapPin className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">Map Error</h4>
+          <p className="text-gray-600">Unable to load map. Please check your internet connection.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading map...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+    return (
+      <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
+        <div className="text-center">
+          <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h4 className="text-lg font-medium text-gray-900 mb-2">Map Configuration Required</h4>
+          <p className="text-gray-600">Google Maps API key not configured</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <GoogleMap
+        mapContainerStyle={mapContainerStyle}
+        center={center}
+        zoom={15}
+        options={{
+          zoomControl: true,
+          streetViewControl: true,
+          mapTypeControl: true,
+          fullscreenControl: true,
+        }}
+      >
+        <Marker
+          position={center}
+          title={project?.name}
+          icon={{
+            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M16 2C10.48 2 6 6.48 6 12C6 20 16 30 16 30C16 30 26 20 26 12C26 6.48 21.52 2 16 2ZM16 16C13.79 16 12 14.21 12 12C12 9.79 13.79 8 16 8C18.21 8 20 9.79 20 12C20 14.21 18.21 16 16 16Z" fill="#3B82F6"/>
+              </svg>
+            `),
+            scaledSize: new window.google.maps.Size(32, 32),
+          }}
+        />
+      </GoogleMap>
+
+      {/* Map Controls */}
+      <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center">
+          <Navigation className="w-4 h-4 mr-1" />
+          <span>
+            {project?.latitude && project?.longitude
+              ? `${parseFloat(project.latitude).toFixed(4)}, ${parseFloat(project.longitude).toFixed(4)}`
+              : 'Coordinates not available'
+            }
+          </span>
+        </div>
+        <button
+          onClick={() => {
+            const url = `https://www.google.com/maps/search/?api=1&query=${center.lat},${center.lng}`;
+            window.open(url, '_blank');
+          }}
+          className="flex items-center text-blue-600 hover:text-blue-700 font-medium"
+        >
+          <MapPin className="w-4 h-4 mr-1" />
+          Open in Google Maps
+        </button>
+      </div>
+    </div>
+  );
+}
 
 const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
   const router = useRouter();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [imageError, setImageError] = useState(false);
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available':
+      case 'AVAILABLE':
         return 'bg-green-100 text-green-800';
-      case 'reserved':
+      case 'RESERVED':
         return 'bg-yellow-100 text-yellow-800';
-      case 'sold':
+      case 'SOLD':
         return 'bg-red-100 text-red-800';
+      case 'UNDER_CONSTRUCTION':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getUnitTypeDisplay = (unitType) => {
+    switch (unitType) {
+      case 'STUDIO':
+        return 'Studio';
+      case 'ONE_BEDROOM':
+        return '1 Bedroom';
+      case 'TWO_BEDROOM':
+        return '2 Bedroom';
+      case 'THREE_BEDROOM':
+        return '3 Bedroom';
+      case 'FOUR_BEDROOM':
+        return '4 Bedroom';
+      case 'PENTHOUSE':
+        return 'Penthouse';
+      default:
+        return unitType?.replace('_', ' ') || 'Unknown';
     }
   };
 
@@ -56,14 +204,36 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
-            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center">
-              <Building className="w-8 h-8 text-gray-400" />
+            <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center relative">
+              {unit.images && unit.images.length > 0 && !imageError ? (
+                <img
+                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                  alt={`Unit ${unit.unitNumber}`}
+                  className="w-full h-32 object-cover"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <Building className="w-8 h-8 text-gray-400" />
+
+              )}
+              {unit.featured && (
+                <div className="absolute -top-1 -right-1">
+                  <Award className="w-4 h-4 text-yellow-500" />
+                </div>
+              )}
             </div>
 
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                Unit {unit.unitNumber}
-              </h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Unit {unit.unitNumber}
+                </h3>
+                {unit.isFeatured && (
+                  <span className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                    Featured
+                  </span>
+                )}
+              </div>
               <p className="text-gray-600 text-sm mb-2">{unit.description}</p>
               <div className="flex items-center space-x-4 text-sm text-gray-600">
                 <span className="flex items-center">
@@ -78,7 +248,15 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
                   <Square className="w-4 h-4 mr-1" />
                   {unit.sqft} sq ft
                 </span>
+                <span className="text-blue-600 font-medium">
+                  {getUnitTypeDisplay(unit.unitType)}
+                </span>
               </div>
+              {unit.floor && (
+                <div className="text-sm text-gray-500 mt-1">
+                  Floor {unit.floor}
+                </div>
+              )}
             </div>
           </div>
 
@@ -86,9 +264,16 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             <div className="text-2xl font-bold text-gray-900 mb-2">
               {formatPrice(unit.price)}
             </div>
-            <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
-              {unit.status.charAt(0).toUpperCase() + unit.status.slice(1)}
-            </span>
+            <div className="flex flex-col gap-1">
+              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
+                {unit.status?.replace('_', ' ')}
+              </span>
+              {unit.currentConstructionStage && (
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentConstructionStage)}`}>
+                  {ConstructionStages[unit.currentConstructionStage]?.label}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -100,19 +285,50 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       className="bg-white rounded-lg shadow-sm border overflow-hidden hover:shadow-md transition-shadow cursor-pointer group"
       onClick={handleUnitClick}
     >
+
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
-        <Building className="w-16 h-16 text-gray-400" />
-        <div className="absolute top-4 right-4">
+        {unit.images && unit.images.length > 0 && !imageError ? (
+
+          <img
+            src={`${apiBaseUrl}/images/${unit.images[0]}`}
+            alt={`Unit ${unit.unitNumber}`}
+            className="w-full h-full object-cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Building className="w-16 h-16 text-gray-400" />
+        )}
+        <div className="absolute top-4 right-4 flex flex-col gap-2">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
-            {unit.status.charAt(0).toUpperCase() + unit.status.slice(1)}
+            {unit.status?.replace('_', ' ')}
           </span>
+          {unit.currentConstructionStage && (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentConstructionStage)}`}>
+              <Wrench className="w-3 h-3 inline mr-1" />
+              {ConstructionStages[unit.currentConstructionStage]?.label}
+            </span>
+          )}
         </div>
+        {unit.featured && (
+          <div className="absolute top-4 left-4">
+            <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full font-medium flex items-center">
+              <Award className="w-3 h-3 mr-1" />
+              Featured
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
-          Unit {unit.unitNumber}
-        </h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+            Unit {unit.unitNumber}
+          </h3>
+          <span className="text-sm text-blue-600 font-medium">
+            {getUnitTypeDisplay(unit.unitType)}
+          </span>
+        </div>
+
         <p className="text-gray-600 text-sm mb-4 line-clamp-2">{unit.description}</p>
 
         <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
@@ -128,6 +344,11 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             <Square className="w-4 h-4 mr-1" />
             {unit.sqft} sq ft
           </span>
+          {unit.floor && (
+            <span className="text-xs text-gray-500">
+              Floor {unit.floor}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-between">
@@ -150,34 +371,46 @@ export default function ProjectDetailPage() {
   const [unitsViewMode, setUnitsViewMode] = useState('grid');
   const [unitsFilter, setUnitsFilter] = useState('all');
   const [unitsSortBy, setUnitsSortBy] = useState('unitNumber');
+  const { projects, loading: isLoading, error } = useProjects();
+  const { units } = useUnits();
+  const [open, setOpen] = useState(false)
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [imageError, setImageError] = useState(false);
 
-  const project = Projects.find(p => p.id === parseInt(params.projectId));
 
-  if (!project) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Project Not Found</h1>
-          <button
-            onClick={() => router.push('/projects')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Back to Projects
-          </button>
-        </div>
-      </div>
-    );
+  const handleBooking = async ({ datetime, phone }) => {
+    const res = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datetime, phone }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json()
+      throw new Error(error || 'Failed')
+    }
   }
 
-  const projectUnits = Units.filter(unit => unit.projectId === project.id);
+  const project = useMemo(() => {
+    if (!projects || !Array.isArray(projects) || !params?.projectId) {
+      return null;
+    }
+    return projects.find(p => p.id === parseInt(params.projectId));
+  }, [projects, params?.projectId]);
+
+  const projectUnits = useMemo(() => {
+    if (!units || !Array.isArray(units) || !project?.id) {
+      return [];
+    }
+    return units.filter(unit => unit.projectId === project.id);
+  }, [units, project?.id]);
 
   // Calculate project statistics
   const stats = useMemo(() => {
     const total = projectUnits.length;
-    const available = projectUnits.filter(u => u.status === 'available').length;
-    const reserved = projectUnits.filter(u => u.status === 'reserved').length;
-    const sold = projectUnits.filter(u => u.status === 'sold').length;
+    const available = projectUnits.filter(u => u.status === 'AVAILABLE').length;
+    const reserved = projectUnits.filter(u => u.status === 'RESERVED').length;
+    const sold = projectUnits.filter(u => u.status === 'SOLD').length;
+    const underConstruction = projectUnits.filter(u => u.status === 'UNDER_CONSTRUCTION').length;
 
     const prices = projectUnits.map(u => u.price).filter(p => p > 0);
     const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
@@ -186,26 +419,45 @@ export default function ProjectDetailPage() {
 
     const salesProgress = total > 0 ? ((sold + reserved) / total * 100) : 0;
 
+    // Construction stage breakdown
+    const stageBreakdown = projectUnits.reduce((acc, unit) => {
+      if (unit.currentConstructionStage) {
+        acc[unit.currentConstructionStage] = (acc[unit.currentConstructionStage] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    // Overall project construction progress
+    const projectConstructionProgress = project?.currentConstructionStage
+      ? getConstructionProgressPercentage(project.currentConstructionStage)
+      : 0;
+
     return {
       total,
       available,
       reserved,
       sold,
+      underConstruction,
       minPrice,
       maxPrice,
       avgPrice,
-      salesProgress
+      salesProgress,
+      stageBreakdown,
+      projectConstructionProgress
     };
-  }, [projectUnits]);
+  }, [projectUnits, project]);
 
   // Filter and sort units
   const filteredUnits = useMemo(() => {
     let filtered = projectUnits;
 
     if (unitsFilter !== 'all') {
-      filtered = filtered.filter(unit => unit.status === unitsFilter);
+      if (unitsFilter === 'featured') {
+        filtered = filtered.filter(unit => unit.isFeatured);
+      } else {
+        filtered = filtered.filter(unit => unit.status === unitsFilter);
+      }
     }
-
     filtered.sort((a, b) => {
       switch (unitsSortBy) {
         case 'unitNumber':
@@ -218,6 +470,16 @@ export default function ProjectDetailPage() {
           return a.sqft - b.sqft;
         case 'size-desc':
           return b.sqft - a.sqft;
+        case 'floor-asc':
+          return (a.floor || 0) - (b.floor || 0);
+        case 'floor-desc':
+          return (b.floor || 0) - (a.floor || 0);
+        case 'featured':
+          return b.isFeatured - a.isFeatured;
+        case 'construction-progress':
+          const aProgress = getConstructionProgressPercentage(a.currentConstructionStage || 'PLANNING');
+          const bProgress = getConstructionProgressPercentage(b.currentConstructionStage || 'PLANNING');
+          return bProgress - aProgress;
         default:
           return 0;
       }
@@ -226,13 +488,40 @@ export default function ProjectDetailPage() {
     return filtered;
   }, [projectUnits, unitsFilter, unitsSortBy]);
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Project Not Found</h1>
+          <button
+            onClick={() => router.push('/projects')}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Back to projects
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'completed':
+      case 'COMPLETED':
         return CheckCircle;
-      case 'under_construction':
+      case 'UNDER_CONSTRUCTION':
         return Clock;
-      case 'planning':
+      case 'PLANNING':
+        return AlertCircle;
+      case 'ON_HOLD':
         return AlertCircle;
       default:
         return Building;
@@ -241,12 +530,14 @@ export default function ProjectDetailPage() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed':
+      case 'COMPLETED':
         return 'bg-green-100 text-green-800';
-      case 'under_construction':
+      case 'UNDER_CONSTRUCTION':
         return 'bg-blue-100 text-blue-800';
-      case 'planning':
+      case 'PLANNING':
         return 'bg-yellow-100 text-yellow-800';
+      case 'ON_HOLD':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -257,6 +548,7 @@ export default function ProjectDetailPage() {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'units', label: `Units (${stats.total})` },
+    { id: 'construction', label: 'Construction Progress' },
     { id: 'amenities', label: 'Amenities' },
     { id: 'location', label: 'Location' },
     { id: 'gallery', label: 'Gallery' }
@@ -271,26 +563,25 @@ export default function ProjectDetailPage() {
           className="flex items-center text-gray-600 hover:text-gray-900 mb-6 transition-colors"
         >
           <ArrowLeft className="w-5 h-5 mr-2" />
-          Back to Projects
+          Back to projects
         </button>
 
         {/* Hero Section */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
+
           <div className="relative h-96">
-            {project.images && project.images.length > 0 ? (
+            {!imageError && project.images && project.images.length > 0 ? (
               <img
-                src={project.images[0]}
+                src={`${apiBaseUrl}/images/${project.images[0]}`}
                 alt={project.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = 'none';
-                  e.target.nextSibling.style.display = 'flex';
-                }}
+                className="w-full h-full object-cover "
+                onError={() => setImageError(true)}
               />
-            ) : null}
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-              <Building className="w-24 h-24 text-blue-400" />
-            </div>
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+                <Building className="w-24 h-24 text-blue-400" />
+              </div>
+            )}
 
             {/* Overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
@@ -298,15 +589,26 @@ export default function ProjectDetailPage() {
                 <div className="flex items-center mb-4">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white`}>
                     <StatusIcon className="w-4 h-4 mr-2" />
-                    {project.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    {project.status?.replace('_', ' ')}
                   </span>
+                  {project.currentConstructionStage && (
+                    <span className="ml-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium">
+                      <TrendingUp className="w-4 h-4 mr-2 inline" />
+                      {ConstructionStages[project.currentConstructionStage]?.label} - {stats.projectConstructionProgress}%
+                    </span>
+                  )}
                 </div>
                 <h1 className="text-4xl font-bold mb-2">{project.name}</h1>
                 <div className="flex items-center text-lg mb-4">
                   <MapPin className="w-5 h-5 mr-2" />
-                  {project.location}
+                  {project.address}, {project.subCounty}, {project.county}
                 </div>
                 <p className="text-lg opacity-90 max-w-2xl">{project.description}</p>
+                {project.developerName && (
+                  <div className="mt-4 text-sm opacity-75">
+                    Developer: {project.developerName}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -323,7 +625,7 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
             <div className="text-3xl font-bold text-blue-600 mb-2">{stats.total}</div>
             <div className="text-gray-600">Total Units</div>
@@ -337,10 +639,14 @@ export default function ProjectDetailPage() {
             <div className="text-gray-600">Sold</div>
           </div>
           <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
+            <div className="text-3xl font-bold text-orange-600 mb-2">{stats.projectConstructionProgress}%</div>
+            <div className="text-gray-600">Construction</div>
+          </div>
+          <div className="bg-white rounded-lg shadow-sm border p-6 text-center">
             <div className="text-3xl font-bold text-gray-900 mb-2">
-              {stats.minPrice === stats.maxPrice ?
-                formatPrice(stats.minPrice) :
-                `${formatPrice(stats.minPrice)}`
+              {project.minPrice && project.maxPrice && project.minPrice === project.maxPrice ?
+                formatPrice(project.minPrice) :
+                formatPrice(project.minPrice || stats.minPrice)
               }
             </div>
             <div className="text-gray-600">Starting From</div>
@@ -375,10 +681,12 @@ export default function ProjectDetailPage() {
                   <div>
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">Project Details</h3>
                     <div className="space-y-4">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Developer</span>
-                        <span className="font-medium text-gray-900">{project.developer}</span>
-                      </div>
+                      {project.developerName && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Developer</span>
+                          <span className="font-medium text-gray-900">{project.developerName}</span>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-600">Total Units</span>
                         <span className="font-medium text-gray-900">{stats.total}</span>
@@ -386,28 +694,53 @@ export default function ProjectDetailPage() {
                       <div className="flex justify-between">
                         <span className="text-gray-600">Price Range</span>
                         <span className="font-medium text-gray-900">
-                          {stats.minPrice === stats.maxPrice ?
-                            formatPrice(stats.minPrice) :
-                            `${formatPrice(stats.minPrice)} - ${formatPrice(stats.maxPrice)}`
-                          }
+                          {project.minPrice && project.maxPrice ? (
+                            project.minPrice === project.maxPrice ?
+                              formatPrice(project.minPrice) :
+                              `${formatPrice(project.minPrice)} - ${formatPrice(project.maxPrice)}`
+                          ) : (
+                            stats.minPrice === stats.maxPrice ?
+                              formatPrice(stats.minPrice) :
+                              `${formatPrice(stats.minPrice)} - ${formatPrice(stats.maxPrice)}`
+                          )}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Average Price</span>
                         <span className="font-medium text-gray-900">{formatPrice(stats.avgPrice)}</span>
                       </div>
-                      {project.expectedCompletion && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Construction Stage</span>
+                        <span className={`px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(project.currentConstructionStage || 'PLANNING')}`}>
+                          {ConstructionStages[project.currentConstructionStage || 'PLANNING']?.label}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Construction Progress</span>
+                        <span className="font-medium text-gray-900">{stats.projectConstructionProgress}%</span>
+                      </div>
+                      {project.startDate && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Expected Completion</span>
+                          <span className="text-gray-600">Start Date</span>
                           <span className="font-medium text-gray-900">
-                            {new Date(project.expectedCompletion).toLocaleDateString()}
+                            {new Date(project.startDate).toLocaleDateString()}
                           </span>
                         </div>
                       )}
-                      {project.status === 'under_construction' && (
+                      {project.targetCompletionDate && (
                         <div className="flex justify-between">
-                          <span className="text-gray-600">Construction Progress</span>
-                          <span className="font-medium text-gray-900">{project.constructionProgress}%</span>
+                          <span className="text-gray-600">Target Completion</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(project.targetCompletionDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                      {project.completionDate && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Completed On</span>
+                          <span className="font-medium text-gray-900">
+                            {new Date(project.completionDate).toLocaleDateString()}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -428,8 +761,8 @@ export default function ProjectDetailPage() {
                               style={{ width: `${(stats.sold / stats.total * 100)}%` }}
                             />
                             <div
-                              className="bg-yellow-50 rounded-lg"
-                              style={{ transitionDuration: '300ms', width: `${(stats.reserved / stats.total * 100)}%` }}
+                              className="bg-yellow-500 transition-all duration-300"
+                              style={{ width: `${(stats.reserved / stats.total * 100)}%` }}
                             />
                           </div>
                         </div>
@@ -440,21 +773,42 @@ export default function ProjectDetailPage() {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-4 pt-4">
+                      <div className="grid grid-cols-2 gap-4 pt-4">
                         <div className="text-center p-4 bg-green-50 rounded-lg">
                           <div className="text-2xl font-bold text-green-600">{stats.sold}</div>
                           <div className="text-sm text-green-700">Sold</div>
                         </div>
                         <div className="text-center p-4 bg-yellow-50 rounded-lg">
                           <div className="text-2xl font-bold text-yellow-600">{stats.reserved}</div>
-                          <div className="text-sm text-yellow-700otlin">Reserved</div>
+                          <div className="text-sm text-yellow-700">Reserved</div>
                         </div>
                         <div className="text-center p-4 bg-blue-50 rounded-lg">
                           <div className="text-2xl font-bold text-blue-600">{stats.available}</div>
                           <div className="text-sm text-blue-700">Available</div>
                         </div>
+                        <div className="text-center p-4 bg-orange-50 rounded-lg">
+                          <div className="text-2xl font-bold text-orange-600">{stats.underConstruction}</div>
+                          <div className="text-sm text-orange-700">Under Construction</div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Construction Stage Breakdown */}
+                    {Object.keys(stats.stageBreakdown).length > 0 && (
+                      <div className="mt-6">
+                        <h4 className="text-lg font-medium text-gray-900 mb-3">Unit Construction Stages</h4>
+                        <div className="space-y-2">
+                          {Object.entries(stats.stageBreakdown).map(([stage, count]) => (
+                            <div key={stage} className="flex justify-between items-center">
+                              <span className={`text-sm px-2 py-1 rounded-full ${getConstructionStageColor(stage)}`}>
+                                {ConstructionStages[stage]?.label || stage.replace('_', ' ')}
+                              </span>
+                              <span className="text-sm font-medium text-gray-900">{count} units</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -466,7 +820,7 @@ export default function ProjectDetailPage() {
                       <Phone className="w-5 h-5 text-blue-600 mr-3" />
                       <div>
                         <div className="font-medium text-gray-900">Sales Office</div>
-                        <div className="text-gray-600">+1 (555) 123-4567</div>
+                        <div className="text-gray-600">+254 (700) 123-456</div>
                       </div>
                     </div>
                     <div className="flex items-center">
@@ -490,24 +844,30 @@ export default function ProjectDetailPage() {
                     <select
                       value={unitsFilter}
                       onChange={(e) => setUnitsFilter(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="text-gray-800 placeholder-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="all">All Units ({stats.total})</option>
-                      <option value="available">Available ({stats.available})</option>
-                      <option value="reserved">Reserved ({stats.reserved})</option>
-                      <option value="sold">Sold ({stats.sold})</option>
+                      <option value="AVAILABLE">Available ({stats.available})</option>
+                      <option value="RESERVED">Reserved ({stats.reserved})</option>
+                      <option value="SOLD">Sold ({stats.sold})</option>
+                      <option value="UNDER_CONSTRUCTION">Under Construction ({stats.underConstruction})</option>
+                      <option value="featured">Featured Units</option>
                     </select>
 
                     <select
                       value={unitsSortBy}
                       onChange={(e) => setUnitsSortBy(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="text-gray-800 placeholder-gray-500 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="unitNumber">Unit Number</option>
                       <option value="price-asc">Price: Low to High</option>
                       <option value="price-desc">Price: High to Low</option>
                       <option value="size-asc">Size: Small to Large</option>
                       <option value="size-desc">Size: Large to Small</option>
+                      <option value="floor-asc">Floor: Low to High</option>
+                      <option value="floor-desc">Floor: High to Low</option>
+                      <option value="construction-progress">Construction Progress</option>
+                      <option value="featured">Featured First</option>
                     </select>
                   </div>
 
@@ -526,6 +886,7 @@ export default function ProjectDetailPage() {
                     </button>
                   </div>
                 </div>
+
                 {/* Units Display */}
                 {filteredUnits.length > 0 ? (
                   <div className={
@@ -551,6 +912,130 @@ export default function ProjectDetailPage() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Construction Progress Tab */}
+            {activeTab === 'construction' && (
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6">Construction Progress Overview</h3>
+
+                  {/* Overall Project Progress */}
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h4 className="text-lg font-medium text-gray-900">Overall Project Progress</h4>
+                        <p className="text-gray-600">Current stage: {ConstructionStages[project.currentConstructionStage || 'PLANNING']?.label}</p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-3xl font-bold text-blue-600">{stats.projectConstructionProgress}%</div>
+                        <div className="text-sm text-gray-600">Complete</div>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-white rounded-full h-4 mb-4">
+                      <div
+                        className="bg-gradient-to-r from-blue-500 to-indigo-600 h-4 rounded-full transition-all duration-500"
+                        style={{ width: `${stats.projectConstructionProgress}%` }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>Started</span>
+                      <span>In Progress</span>
+                      <span>Completed</span>
+                    </div>
+                  </div>
+
+                  {/* Construction Stages Timeline */}
+                  <div className="mb-8">
+                    <h4 className="text-lg font-medium text-gray-900 mb-4">Construction Stages</h4>
+                    <div className="space-y-4">
+                      {Object.entries(ConstructionStages).map(([key, stage]) => {
+                        const isCompleted = stats.projectConstructionProgress >= stage.milestone;
+                        const isCurrent = project.currentConstructionStage === key;
+
+                        return (
+                          <div key={key} className={`flex items-center p-4 rounded-lg border-2 transition-all ${isCurrent
+                              ? 'border-blue-500 bg-blue-50'
+                              : isCompleted
+                                ? 'border-green-200 bg-green-50'
+                                : 'border-gray-200 bg-gray-50'
+                            }`}>
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-4 ${isCurrent
+                                ? 'bg-blue-500 text-white'
+                                : isCompleted
+                                  ? 'bg-green-500 text-white'
+                                  : 'bg-gray-300 text-gray-600'
+                              }`}>
+                              {isCompleted ? (
+                                <CheckCircle className="w-5 h-5" />
+                              ) : isCurrent ? (
+                                <Clock className="w-5 h-5" />
+                              ) : (
+                                <span className="text-sm font-medium">{stage.milestone}</span>
+                              )}
+                            </div>
+
+                            <div className="flex-1">
+                              <div className="flex items-center justify-between">
+                                <h5 className={`font-medium ${isCurrent ? 'text-blue-900' : isCompleted ? 'text-green-900' : 'text-gray-700'
+                                  }`}>
+                                  {stage.label}
+                                </h5>
+                                <span className={`text-sm px-2 py-1 rounded-full ${isCurrent
+                                    ? 'bg-blue-100 text-blue-800'
+                                    : isCompleted
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                  {stage.milestone}% Milestone
+                                </span>
+                              </div>
+
+                              {isCurrent && (
+                                <p className="text-sm text-blue-700 mt-1">Currently in progress</p>
+                              )}
+                              {isCompleted && !isCurrent && (
+                                <p className="text-sm text-green-700 mt-1">Completed</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Unit Construction Breakdown */}
+                  {Object.keys(stats.stageBreakdown).length > 0 && (
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Unit Construction Breakdown</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {Object.entries(stats.stageBreakdown).map(([stage, count]) => (
+                          <div key={stage} className="bg-white border rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className={`
+px-2 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(stage)}`}>
+                                {ConstructionStages[stage]?.label}
+                              </span>
+                              <span className="text-2xl font-bold text-gray-900">{count}</span>
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {((count / stats.total) * 100).toFixed(1)}% of total units
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                              <div
+                                className="bg-blue-500 h-2 rounded-full"
+                                style={{ width: `${(count / stats.total) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -591,7 +1076,12 @@ export default function ProjectDetailPage() {
                         <MapPin className="w-5 h-5 text-gray-400 mr-3 mt-0.5" />
                         <div>
                           <div className="font-medium text-gray-900">{project.address}</div>
-                          <div className="text-gray-600">{project.city}, {project.state} {project.zipCode}</div>
+                          <div className="text-gray-600">{project.subCounty}, {project.county}</div>
+                          {project.latitude && project.longitude && (
+                            <div className="text-sm text-gray-500 mt-1">
+                              Coordinates: {parseFloat(project.latitude).toFixed(4)}, {parseFloat(project.longitude).toFixed(4)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -600,19 +1090,28 @@ export default function ProjectDetailPage() {
                   <div>
                     <h4 className="text-lg font-medium text-gray-900 mb-4">Neighborhood</h4>
                     <p className="text-gray-600">
-                      Located in the heart of {project.location}, this development offers easy access to
+                      Located in {project.subCounty}, {project.county}, this development offers easy access to
                       shopping, dining, entertainment, and public transportation.
                     </p>
+
+                    {/* Nearby Places */}
+                    <div className="mt-4">
+                      <h5 className="font-medium text-gray-900 mb-2">Nearby Amenities</h5>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>• Shopping centers and markets</div>
+                        <div>• Schools and educational institutions</div>
+                        <div>• Healthcare facilities</div>
+                        <div>• Public transportation</div>
+                        <div>• Recreational facilities</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Map Placeholder */}
-                <div className="bg-gray-100 rounded-lg h-96 flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 mb-2">Interactive Map</h4>
-                    <p className="text-gray-600">Map integration coming soon</p>
-                  </div>
+                {/* Google Map */}
+                <div>
+                  <h4 className="text-lg font-medium text-gray-900 mb-4">Interactive Map</h4>
+                  <ProjectMap project={project} />
                 </div>
               </div>
             )}
@@ -626,7 +1125,7 @@ export default function ProjectDetailPage() {
                     {project.images.map((image, index) => (
                       <div key={index} className="aspect-w-16 aspect-h-12 bg-gray-100 rounded-lg overflow-hidden">
                         <img
-                          src={image}
+                          src={`${apiBaseUrl}/images/${image}`}
                           alt={`${project.name} - Image ${index + 1}`}
                           className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                           onError={(e) => {
@@ -655,18 +1154,44 @@ export default function ProjectDetailPage() {
         </div>
 
         {/* CTA Section */}
-        <div className="bg-blue-600 rounded-xl p-8 text-center text-white">
+        <div className="bg-blue-600 rounded-xl p-8 text-center text-white ">
           <h3 className="text-2xl font-bold mb-4">Interested in {project.name}?</h3>
           <p className="text-blue-100 mb-6 max-w-2xl mx-auto">
             Contact our sales team to schedule a viewing, get more information, or reserve your unit today.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-              Schedule Viewing
-            </button>
-            <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
-              Download Brochure
-            </button>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <div className='p-7'>
+              <button className="px-8 py-3 border-2 bg-white text-blue-600 rounded-lg font-semibold hover:bg-blue-600 hover:text-white transition-colors"
+                onClick={() => setOpen(true)}
+              >
+                Book a Visit
+              </button>
+              <BookVisitModal
+                isOpen={open}
+                onClose={() => setOpen(false)}
+                onBooking={handleBooking}
+              />
+            </div>
+            {/* Modal is conditionally rendered */}
+            <div className="p-7">
+              <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                Download Brochure
+              </button>
+            </div>
+            <div className='p-8'>
+              {project.latitude && project.longitude && (
+                <button
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${project.latitude},${project.longitude}`;
+                    window.open(url, '_blank');
+                  }}
+                  className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors flex items-center justify-center"
+                >
+                  <Navigation className="w-4 h-4 mr-2" />
+                  Get Directions
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

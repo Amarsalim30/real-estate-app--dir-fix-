@@ -1,7 +1,7 @@
 'use client';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
 import { useSession } from 'next-auth/react';
 import { formatPrice } from '@/utils/format';
 import { 
@@ -21,9 +21,12 @@ export default function ReservationSuccessPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
+      const { projects, loading: isLoading, error } = useProjects();
+  const { units } = useUnits();
+  
 
-  const unit = Array.isArray(Units) ? Units.find(u => u.id === parseInt(params.unitId)) : null;
-  const project = Array.isArray(Projects) ? Projects.find(p => p.id === parseInt(params.projectId)) : null;
+  const unit = Array.isArray(units) ? units.find(u => u.id === parseInt(params.unitId)) : null;
+  const project = Array.isArray(projects) ? projects.find(p => p.id === parseInt(params.projectId)) : null;
   
   if (!unit || !project) {
     return (

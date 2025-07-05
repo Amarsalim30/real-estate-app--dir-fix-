@@ -42,10 +42,11 @@ export default function LoginForm() {
       setServerError("");
 
       if (res?.ok) {
+        toast.success("Logged in successfully!");
         const sessionRes = await fetch("/api/auth/session");
         const session = await sessionRes.json();
 
-        if (session?.user?.role === "admin") {
+        if (session?.user?.role === "ADMIN") {
           router.push("/dashboard/admin");
         } else {
           router.push("/dashboard");

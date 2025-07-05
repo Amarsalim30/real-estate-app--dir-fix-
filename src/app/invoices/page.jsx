@@ -1,12 +1,18 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo ,useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import { Invoices, InvoiceStatuses } from '@/data/invoices';
-import { Units } from '@/data/units';
-import { Buyers } from '@/data/buyers';
-import { Projects } from '@/data/projects';
+import {  InvoiceStatuses } from '@/data/invoices';
+// import { Units } from '@/data/units';
+// import { Buyers } from '@/data/buyers';
+// import { Projects } from '@/data/projects';
+
+import { useBuyers } from '@/hooks/useBuyers';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
+import { useInvoices } from '@/hooks/useInvoices';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
 import { 
@@ -26,7 +32,9 @@ import {
   ChevronDown,
   ArrowUpDown,
   User,
-  Building
+  Building,
+  Phone,
+  Mail
 } from 'lucide-react';
 
 const StatusBadge = ({ status }) => {
@@ -76,10 +84,10 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const InvoiceRow = ({ invoice, onView }) => {
-  const unit = Units.find(u => u.id === invoice.unitId);
-  const buyer = Buyers.find(b => b.id === invoice.buyerId);
-  const project = Projects.find(p => p.id === invoice.projectId);
+const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
+  const unit = units?.find(u => u.id === invoice.unitId);
+  const buyer = buyers?.find(b => b.id === invoice.buyerId);
+  const project = projects?.find(p => p.id === invoice.projectId);
 
   const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
                    new Date(invoice.dueDate) < new Date();
@@ -100,21 +108,23 @@ const InvoiceRow = ({ invoice, onView }) => {
         </div>
       </td>
       
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-            <User className="w-4 h-4 text-blue-600" />
-          </div>
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
+      {isAdmin && (
+        <td className="px-6 py-4 whitespace-nowrap">
+          <div className="flex items-center">
+            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+              <User className="w-4 h-4 text-blue-600" />
             </div>
-            <div className="text-sm text-gray-500">
-              {buyer?.email}
+            <div>
+              <div className="text-sm font-medium text-gray-900">
+                {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
+              </div>
+              <div className="text-sm text-gray-500">
+                {buyer?.email}
+              </div>
             </div>
           </div>
-        </div>
-      </td>
+        </td>
+      )}
       
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center">
@@ -165,6 +175,11 @@ const InvoiceRow = ({ invoice, onView }) => {
 };
 
 function InvoicesContent() {
+  const { buyers, loading: buyersLoading, error: buyersError } = useBuyers();
+  const { units, loading: unitsLoading, error: unitsError } = useUnits();
+  const { projects, loading: projectsLoading, error: projectsError } = useProjects();
+  const { invoices, loading: invoicesLoading, error: invoicesError } = useInvoices();
+
   const { data: session } = useSession();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -176,25 +191,53 @@ function InvoicesContent() {
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
-  // Filter and sort invoices
-  const filteredInvoices = useMemo(() => {
-    let filtered = Invoices;
+  // Get user's buyer ID for filtering
+// Get user's buyer ID for filtering
+const getUserBuyerId = () => {
+  if (session?.user?.buyerId) {
+    return session.user.buyerId;
+  }
+  
+  // Fallback: find buyer by email if buyerId not in session
+  const buyer = buyers?.find(b => b.email === session?.user?.email);
+  return buyer?.id || null;
+};
 
-    // Filter by search term
-    if (searchTerm) {
-      filtered = filtered.filter(invoice => {
-        const buyer = Buyers.find(b => b.id === invoice.buyerId);
-        const unit = Units.find(u => u.id === invoice.unitId);
-        const project = Projects.find(p => p.id === invoice.projectId);
-        
-        return (
-          invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (project && project.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      });
-    }
+
+  const userBuyerId = getUserBuyerId();
+
+  // Get filtered invoices based on user role
+// Get filtered invoices based on user role
+const getFilteredInvoices = () => {
+  if (!invoices) return []; // Handle loading state
+  if (isAdmin) {
+    return invoices; // Admin sees all invoices
+  } else {
+    // Regular users only see their own invoices
+    return invoices.filter(invoice => invoice.buyerId === userBuyerId);
+  }
+};
+
+
+// Filter and sort invoices
+const filteredInvoices = useMemo(() => {
+  let filtered = getFilteredInvoices();
+
+  // Filter by search term
+  if (searchTerm) {
+    filtered = filtered.filter(invoice => {
+      const buyer = buyers?.find(b => b.id === invoice.buyerId);
+      const unit = units?.find(u => u.id === invoice.unitId);
+      const project = projects?.find(p => p.id === invoice.projectId);
+      
+      return (
+        invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    });
+  }
 
     // Filter by status
     if (statusFilter !== 'all') {
@@ -266,7 +309,7 @@ function InvoicesContent() {
     });
 
     return filtered;
-  }, [searchTerm, statusFilter, dateRange, sortBy, sortOrder]);
+  }, [searchTerm, statusFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId, invoices, buyers, units, projects]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -311,13 +354,62 @@ function InvoicesContent() {
     router.push(`/invoices/${invoice.id}`);
   };
 
+  // Check loading states
+const isLoading = buyersLoading || unitsLoading || projectsLoading || invoicesLoading;
+
+// Check error states
+const hasError = buyersError || unitsError || projectsError || invoicesError;
+const errorMessage = buyersError || unitsError || projectsError || invoicesError;
+
+// Add loading state before the main return
+if (isLoading) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading invoices...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Add error state
+if (hasError) {
+  return (
+    <div className="p-6">
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
+          <p className="text-gray-600 mb-4">{errorMessage}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Reload Page
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
   return (
     <div className="p-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Invoices</h1>
-          <p className="text-gray-600">Manage and track all your invoices</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {isAdmin ? 'Invoices' : 'Your Invoices'}
+          </h1>
+          <p className="text-gray-600">
+            {isAdmin 
+              ? 'Manage and track all invoices'
+              : 'View your invoices and payment status'
+            }
+          </p>
         </div>
         
         {isAdmin && (
@@ -336,7 +428,9 @@ function InvoicesContent() {
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Invoices</p>
+              <p className="text-sm font-medium text-gray-600">
+                {isAdmin ? 'Total Invoices' : 'Your Invoices'}
+              </p>
               <p className="text-2xl font-bold text-gray-900">{summaryStats.total}</p>
             </div>
             <FileText className="w-8 h-8 text-blue-600" />
@@ -355,10 +449,11 @@ function InvoicesContent() {
             <CheckCircle className="w-8 h-8 text-green-600" />
           </div>
           <p className="text-sm text-gray-600 mt-2">
-            {formatPrice(summaryStats.paidAmount)} collected
+            {formatPrice(summaryStats.paidAmount)} {isAdmin ? 'collected' : 'paid'}
           </p>
         </div>
 
+        {/* <div className="bg-white rounded-lg shadow-sm border p-6"> */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -380,9 +475,41 @@ function InvoicesContent() {
             </div>
             <AlertTriangle className="w-8 h-8 text-red-600" />
           </div>
-          <p className="text-sm text-red-600 mt-2">Requires attention</p>
+          <p className="text-sm text-red-600 mt-2">
+            {isAdmin ? 'Requires attention' : 'Please pay soon'}
+          </p>
         </div>
       </div>
+
+      {/* User Alert for Overdue Invoices - Non-Admin Only */}
+      {!isAdmin && summaryStats.overdue > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-red-900">
+                {summaryStats.overdue === 1 ? 'You have an overdue invoice' : `You have ${summaryStats.overdue} overdue invoices`}
+              </h3>
+              <p className="text-sm text-red-700 mt-1">
+                Please review and pay your overdue invoices to avoid late fees. 
+                Contact support if you need assistance with payment arrangements.
+              </p>
+              <div className="mt-3 flex items-center space-x-4">
+                <button
+                  onClick={() => setStatusFilter('overdue')}
+                  className="text-sm font-medium text-red-700 hover:text-red-800"
+                >
+                  View Overdue Invoices →
+                </button>
+                <span className="text-red-400">|</span>
+                <a href="tel:1-800-SUPPORT" className="text-sm font-medium text-red-700 hover:text-red-800">
+                  Call Support
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm border mb-6">
@@ -393,7 +520,7 @@ function InvoicesContent() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
                 type="text"
-                placeholder="Search invoices..."
+                placeholder={isAdmin ? "Search invoices..." : "Search your invoices..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -481,7 +608,7 @@ function InvoicesContent() {
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {filteredInvoices.length} of {Invoices.length} invoices
+              Showing {filteredInvoices.length} of {isAdmin ? invoices.length : getFilteredInvoices().length} invoices
             </span>
             <div className="flex items-center space-x-4">
               <span>Paid: {summaryStats.paid}</span>
@@ -507,9 +634,11 @@ function InvoicesContent() {
                     <ArrowUpDown className="w-4 h-4 ml-1" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Customer
-                </th>
+                {isAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Customer
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Property
                 </th>
@@ -531,7 +660,7 @@ function InvoicesContent() {
                     <ArrowUpDown className="w-4 h-4 ml-1" />
                   </div>
                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -543,17 +672,20 @@ function InvoicesContent() {
                     key={invoice.id}
                     invoice={invoice}
                     onView={handleViewInvoice}
+                    isAdmin={isAdmin}
                   />
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
+                  <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-12 text-center">
                     <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Invoices Found</h3>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      {isAdmin ? 'No Invoices Found' : 'No Invoices Available'}
+                    </h3>
                     <p className="text-gray-600 mb-6">
                       {searchTerm || statusFilter !== 'all' || dateRange !== 'all'
-                        ? 'No invoices match your current filters.'
-                        : 'Get started by creating your first invoice.'
+                        ? (isAdmin ? 'No invoices match your current filters.' : 'No invoices match your current filters.')
+                        : (isAdmin ? 'Get started by creating your first invoice.' : 'You don\'t have any invoices yet.')
                       }
                     </p>
                     {(!searchTerm && statusFilter === 'all' && dateRange === 'all' && isAdmin) && (
@@ -573,7 +705,7 @@ function InvoicesContent() {
         </div>
       </div>
 
-      {/* Bulk Actions */}
+      {/* Admin Bulk Actions */}
       {isAdmin && filteredInvoices.length > 0 && (
         <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
@@ -598,6 +730,86 @@ function InvoicesContent() {
           </div>
         </div>
       )}
+
+      {/* User Export - Non-Admin Only */}
+      {!isAdmin && filteredInvoices.length > 0 && (
+        <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">Export your invoice history:</span>
+            <button className="flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+              <Download className="w-4 h-4 mr-2" />
+              Download PDF
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* User Help Section - Non-Admin Only */}
+      {!isAdmin && (
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-blue-900 mb-4">Need Help with Your Invoices?</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex items-start space-x-3">
+                        <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-900">Call Support</p>
+                <p className="text-sm text-blue-700">1-800-SUPPORT</p>
+                <p className="text-xs text-blue-600">Mon-Fri 9AM-6PM EST</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start space-x-3">
+              <Mail className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-blue-900">Email Support</p>
+                <p className="text-sm text-blue-700">billing@company.com</p>
+                <p className="text-xs text-blue-600">Response within 24 hours</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="mt-4 pt-4 border-t border-blue-200">
+            <h4 className="font-medium text-blue-900 mb-2">Common Questions:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• <strong>Payment Methods:</strong> We accept credit cards, bank transfers, and checks</li>
+              <li>• <strong>Payment Plans:</strong> Contact us to discuss payment arrangement options</li>
+              <li>• <strong>Late Fees:</strong> Applied 15 days after due date - call us to avoid fees</li>
+              <li>• <strong>Receipts:</strong> Download receipts directly from each invoice</li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* No Access Message for Users Without Buyer Records */}
+      {!isAdmin && !userBuyerId && (
+        <div className="mt-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-yellow-900">Account Setup Required</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                We couldn't find your buyer profile. Please contact support to complete your account setup 
+                and access your invoices.
+              </p>
+              <div className="mt-3 flex items-center space-x-4">
+                <a 
+                  href="tel:1-800-SUPPORT" 
+                  className="text-sm font-medium text-yellow-700 hover:text-yellow-800"
+                >
+                  Call Support →
+                </a>
+                <span className="text-yellow-400">|</span>
+                <a 
+                  href="mailto:support@company.com" 
+                  className="text-sm font-medium text-yellow-700 hover:text-yellow-800"
+                >
+                  Email Support
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -606,6 +818,17 @@ export default function InvoicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
+  }
+
+  
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -613,10 +836,23 @@ export default function InvoicesPage() {
       </div>
     );
   }
+  // Allow access for all authenticated users
+  const canViewInvoices = session.user.role === ROLES.ADMIN || 
+                         session.user.role === ROLES.MANAGER ||
+                         session.user.role === ROLES.CASHIER ||
+                         session.user.role === ROLES.USER;
 
-  if (!session?.user) {
-    router.push('/login');
-    return null;
+  if (!canViewInvoices) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Access Denied</h2>
+            <p className="text-gray-600">You don't have permission to view invoices.</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
@@ -625,4 +861,3 @@ export default function InvoicesPage() {
     </DashboardLayout>
   );
 }
-

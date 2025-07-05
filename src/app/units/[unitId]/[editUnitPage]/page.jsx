@@ -1,33 +1,60 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo ,useEffect } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { Units } from '@/data/units';
-import { Projects } from '@/data/projects';
+import { useUnits } from '@/hooks/useUnits';
+import { useProjects } from '@/hooks/useProjects';
+import { useUpdateUnit } from '@/hooks/useUnits';
+import { toast } from 'sonner';
 
 export default function EditUnitPage() {
   const params = useParams();
   const router = useRouter();
   const unitId = parseInt(params.id);
-  
-  const unit = Units.find(u => u.id === unitId);
-  
-  const [formData, setFormData] = useState({
-    unitNumber: unit?.unitNumber || '',
-    projectId: unit?.projectId || '',
-    floor: unit?.floor || '',
-    type: unit?.type || '',
-    bedrooms: unit?.bedrooms || '',
-    bathrooms: unit?.bathrooms || '',
-    sqft: unit?.sqft || '',
-    price: unit?.price || '',
-    status: unit?.status || 'available',
-    description: unit?.description || '',
-    features: unit?.features?.join(', ') || ''
-  });
+  const { projects, loading } = useProjects();
+  const { units } = useUnits();
+  const { updateUnit ,loading: updateLoading } = useUpdateUnit();
+  const [formData, setFormData] = useState({});
+
+  const unit = useMemo(() => {
+    if (!units || !Array.isArray(units) || !params?.unitId) return null;
+    return units.find(u => u.id == parseInt(params.unitId));
+  }, [units, params?.unitId]);
+
+  const project = useMemo(() => {
+    if (!projects || !Array.isArray(projects) || !unit?.projectId) return null;
+    return projects.find(p => p.id === unit.projectId);
+  }, [projects, unit?.projectId]);
+
+  useEffect(() => {
+    if (unit) {
+      setFormData({
+        unitNumber: unit.unitNumber || '',
+        floor: unit.floor || '',
+        type: unit.type || '',
+        bedrooms: unit.bedrooms || '',
+        bathrooms: unit.bathrooms || '',
+        sqft: unit.sqft || '',
+        price: unit.price || '',
+        status: unit.status || 'available',
+        description: unit.description || '',
+        features: Array.isArray(unit.features) ? unit.features.join(', ') : '',
+      });
+    }
+  }, [unit]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  if (loading || updateLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   if (!unit) {
     return (
@@ -51,40 +78,60 @@ export default function EditUnitPage() {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e) => { 
     e.preventDefault();
-    setIsSubmitting(true);
+    if (!unit) {
+      toast.error('Unit data not loaded');
+      return;
+    }
 
-    // Simulate API call
-    setTimeout(() => {
-      console.log('Updated unit data:', {
+    try {
+      setIsSubmitting(true);
+
+      const updatedData = {
         ...formData,
-        features: formData.features.split(',').map(f => f.trim()).filter(f => f),
-        price: parseFloat(formData.price),
-        sqft: parseInt(formData.sqft),
+        features: formData.features ? formData.features.split(',').map(f => f.trim()) : [],
         bedrooms: parseInt(formData.bedrooms),
         bathrooms: parseInt(formData.bathrooms),
+        sqft: parseInt(formData.sqft),
+        price: parseFloat(formData.price),
         floor: parseInt(formData.floor),
-        projectId: parseInt(formData.projectId)
-      });
-      
+      };
+
+      updateUnit(unit.id, updatedData);
+      // Your API call here
+      console.log('Updating unit:', updatedData);
+
+      toast.success('Unit updated successfully!');
+    } catch (error) {
+      console.error('Error updating unit:', error);
+      toast.error('Failed to update unit');
+    } finally {
       setIsSubmitting(false);
-      router.push(`/units/${unitId}`);
-    }, 1000);
+      router.push(`/units`)
+    }
   };
 
+  
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-gray-600 mb-4">
+        <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
           <Link href="/units" className="hover:text-blue-600">Units</Link>
           <span>/</span>
-          <Link href={`/units/${unitId}`} className="hover:text-blue-600">Unit {unit.unitNumber}</Link>
-          <span>/</span>
-          <span>Edit</span>
-        </div>
-        
+          {unit && (
+            <>
+              <Link href={`/units/${unit.id}`} className="hover:text-blue-600">
+                Unit {unit.unitNumber}
+              </Link>
+              <span>/</span>
+              <span className="text-gray-900">Edit</span>
+            </>
+          )}
+        </nav>
+
+
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Edit Unit {unit.unitNumber}
         </h1>
@@ -98,10 +145,10 @@ export default function EditUnitPage() {
             {/* Basic Information */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Basic Information</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700  mb-2">
                     Unit Number *
                   </label>
                   <input
@@ -110,29 +157,32 @@ export default function EditUnitPage() {
                     value={formData.unitNumber}
                     onChange={handleInputChange}
                     required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full border placeholder-gray-500 text-gray-600 border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Project *
+                    Project
                   </label>
                   <select
                     name="projectId"
-                    value={formData.projectId}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={unit?.projectId || ''}
+                    disabled
+                    className="placeholder-gray-500 text-gray-600 w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 "
                   >
                     <option value="">Select Project</option>
-                    {Projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name}
+                    {projects && Array.isArray(projects) && projects.map(proj => (
+                      <option key={proj.id} value={proj.id}>
+                        {proj.name}
                       </option>
                     ))}
                   </select>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Project cannot be changed after unit creation
+                  </p>
                 </div>
+
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -145,7 +195,7 @@ export default function EditUnitPage() {
                     onChange={handleInputChange}
                     required
                     min="1"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -158,14 +208,14 @@ export default function EditUnitPage() {
                     value={formData.type}
                     onChange={handleInputChange}
                     required
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Type</option>
                     <option value="Studio">Studio</option>
-                    <option value="1BR">1 Bedroom</option>
-                    <option value="2BR">2 Bedroom</option>
-                    <option value="3BR">3 Bedroom</option>
-                    <option value="4BR">4 Bedroom</option>
+                    <option value="ONE_BR">1 Bedroom</option>
+                    <option value="TWO_BR">2 Bedroom</option>
+                    <option value="THREE_BR">3 Bedroom</option>
+                    <option value="FOUR_BR">4 Bedroom</option>
                     <option value="Penthouse">Penthouse</option>
                   </select>
                 </div>
@@ -181,7 +231,7 @@ export default function EditUnitPage() {
                     onChange={handleInputChange}
                     required
                     min="0"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -197,7 +247,7 @@ export default function EditUnitPage() {
                     required
                     min="1"
                     step="0.5"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -212,7 +262,7 @@ export default function EditUnitPage() {
                     onChange={handleInputChange}
                     required
                     min="1"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
 
@@ -228,7 +278,7 @@ export default function EditUnitPage() {
                     required
                     min="0"
                     step="1000"
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -237,7 +287,7 @@ export default function EditUnitPage() {
             {/* Description and Features */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Description & Features</h2>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -248,7 +298,7 @@ export default function EditUnitPage() {
                     value={formData.description}
                     onChange={handleInputChange}
                     rows={4}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter unit description..."
                   />
                 </div>
@@ -262,7 +312,7 @@ export default function EditUnitPage() {
                     value={formData.features}
                     onChange={handleInputChange}
                     rows={3}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="Enter features separated by commas (e.g., Balcony, Hardwood Floors, Stainless Appliances)"
                   />
                   <p className="text-sm text-gray-500 mt-1">
@@ -286,7 +336,7 @@ export default function EditUnitPage() {
                   name="status"
                   value={formData.status}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="placeholder-gray-500 text-gray-600 w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="available">Available</option>
                   <option value="reserved">Reserved</option>
@@ -301,14 +351,14 @@ export default function EditUnitPage() {
               <div className="space-y-3">
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  disabled={isSubmitting || !unit}
+                  className="placeholder-gray-500 w-full bg-blue-600 text-white px-4 py-2 rounded-md font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
-                
+
                 <Link
-                  href={`/units/${unitId}`}
+                  href={`/units`}
                   className="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-md font-medium hover:bg-gray-200 transition-colors text-center block"
                 >
                   Cancel
@@ -323,8 +373,8 @@ export default function EditUnitPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Price/sq ft:</span>
                   <span className="font-medium">
-                    {formData.price && formData.sqft ? 
-                      `$${Math.round(formData.price / formData.sqft).toLocaleString()}` : 
+                    {formData.price && formData.sqft ?
+                      `$${Math.round(formData.price / formData.sqft).toLocaleString()}` :
                       'N/A'
                     }
                   </span>
@@ -332,8 +382,8 @@ export default function EditUnitPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Price:</span>
                   <span className="font-medium">
-                    {formData.price ? 
-                      `$${parseInt(formData.price).toLocaleString()}` : 
+                    {formData.price ?
+                      `$${parseInt(formData.price).toLocaleString()}` :
                       'N/A'
                     }
                   </span>
@@ -347,8 +397,8 @@ export default function EditUnitPage() {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Layout:</span>
                   <span className="font-medium">
-                    {formData.bedrooms && formData.bathrooms ? 
-                      `${formData.bedrooms}BR/${formData.bathrooms}BA` : 
+                    {formData.bedrooms && formData.bathrooms ?
+                      `${formData.bedrooms}BR/${formData.bathrooms}BA` :
                       'N/A'
                     }
                   </span>

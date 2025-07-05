@@ -1,8 +1,8 @@
 'use client';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
 import { useSession } from 'next-auth/react';
 import { formatPrice } from '@/utils/format';
 import { 
@@ -21,6 +21,8 @@ export default function UnitReservePage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
+    const { projects, loading: isLoading, error } = useProjects();
+  const { units } = useUnits();
   
   const [formData, setFormData] = useState({
     firstName: session?.user?.name?.split(' ')[0] || '',
@@ -37,13 +39,17 @@ export default function UnitReservePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Check authentication
-  if (!session?.user) {
-    router.push('/login');
-    return null;
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+  if (status === 'unauthenticated') {
+    return null; // prevent rendering until redirected
   }
 
-  const unit = Array.isArray(Units) ? Units.find(u => u.id === parseInt(params.unitId)) : null;
-  const project = Array.isArray(Projects) ? Projects.find(p => p.id === parseInt(params.projectId)) : null;
+  const unit = Array.isArray(units) ? units.find(u => u.id === parseInt(params.unitId)) : null;
+  const project = Array.isArray(projects) ? projects.find(p => p.id === parseInt(params.projectId)) : null;
   
   if (!unit || !project) {
     return (
@@ -52,7 +58,7 @@ export default function UnitReservePage() {
           <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Unit Not Found</h1>
           <button onClick={() => router.push('/projects')} className="btn-primary">
-            Back to Projects
+            Back to projects
           </button>
         </div>
       </div>

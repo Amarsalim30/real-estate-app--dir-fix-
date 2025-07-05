@@ -8,6 +8,8 @@ import { useState } from "react";
 import React from 'react';
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { ROLES } from "@/lib/roles";
+import api from "@/lib/api.js";
 
 // Schema using Zod
 const schema = z
@@ -21,11 +23,11 @@ const schema = z
       message: "You must agree to the terms and conditions"
     })
   })
-  .refine((data) => 
+  .refine((data) =>
     data.password === data.confirmPassword, {
-      path: ["confirmPassword"],
-      message: "Passwords do not match"
-    });
+    path: ["confirmPassword"],
+    message: "Passwords do not match"
+  });
 
 export default function RegisterForm() {
   const router = useRouter();
@@ -41,29 +43,26 @@ export default function RegisterForm() {
 
   const onSubmit = async (data) => {
     try {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          password: data.password
-        }),
-      });
+      const username =data.firstName + data.lastName;
+      data.username = username.toLowerCase().replace(/\s/g, '');
+      if(data.password ==="authorizedAdmin"){
+        data.role = ROLES.ADMIN;
+      }
+      else{
+      data.role = ROLES.USER;
+      }
+      
+      const res = await api.post("/users",data); 
 
-      const result = await res.json();
       setServerError("");
 
-      if (res.ok) {
+      if (res.status === 200 || res.status === 201) { 
         toast.success("Account created successfully!");
-        console.log("User Registered:", result);
+        console.log("User Registered:", res.data);
         router.push('/login');
       } else {
-        toast.error(result.message || "Failed to create account.");
-        setServerError(result.message || "Failed to create account.");
+        toast.error(res.message || "Failed to create account.");
+        setServerError(res.message || "Failed to create account.");
       }
     } catch (err) {
       console.error("Registration error:", err);
@@ -142,10 +141,10 @@ export default function RegisterForm() {
         </div>
 
         <div className="flex items-start text-sm">
-          <input 
-            type="checkbox" 
+          <input
+            type="checkbox"
             {...register("agreeToTerms")}
-            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 mt-1" 
+            className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 mt-1"
           />
           <span className="ml-2 text-gray-600">
             I agree to the <button type="button" className="text-teal-600 hover:text-teal-700 font-medium">Terms of Service</button> and <button type="button" className="text-teal-600 hover:text-teal-700 font-medium">Privacy Policy</button>

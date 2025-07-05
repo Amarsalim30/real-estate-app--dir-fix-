@@ -1,17 +1,19 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Projects } from '@/data/projects';
-import { Units } from '@/data/units';
-import { Buyers } from '@/data/buyers';
 import { useSession } from 'next-auth/react';
 import { formatPrice } from '@/utils/format';
-import { 
-  ArrowLeft, 
-  Building, 
-  MapPin, 
-  Bed, 
-  Bath, 
+
+import { useBuyers } from '@/hooks/useBuyers';
+import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
+
+import {
+  ArrowLeft,
+  Building,
+  MapPin,
+  Bed,
+  Bath,
   Square,
   Calendar,
   User,
@@ -24,7 +26,12 @@ import {
   Clock,
   Eye,
   Download,
-  Calculator
+  Calculator,
+  Award,
+  Wrench,
+  Home,
+  Layers,
+  TrendingUp
 } from 'lucide-react';
 
 export default function UnitDetailPage() {
@@ -33,18 +40,37 @@ export default function UnitDetailPage() {
   const { data: session } = useSession();
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showCalculator, setShowCalculator] = useState(false);
+  const { projects, loading: isLoading, error } = useProjects();
+  const { buyers } = useBuyers();
+  const { units } = useUnits();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-  const unit = Units.find(u => u.id === parseInt(params.unitId));
-  const project = Projects.find(p => p.id === parseInt(params.projectId));
-  
+  const unit = useMemo(() => {
+    if (!units || !Array.isArray(units) || !params?.unitId) return null;
+    return units.find(u => u.id === parseInt(params.unitId));
+  }, [units, params?.unitId]);
+
+  const project = useMemo(() => {
+    if (!projects || !Array.isArray(projects) || !params?.projectId) return null;
+    return projects.find(p => p.id === parseInt(params.projectId));
+  }, [projects, params?.projectId]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   if (!unit || !project) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Building className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-4">Unit Not Found</h1>
-          <button 
-            onClick={() => router.push('/projects')} 
+          <button
+            onClick={() => router.push('/projects')}
             className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Back to Projects
@@ -56,12 +82,14 @@ export default function UnitDetailPage() {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'available':
+      case 'AVAILABLE':
         return 'bg-green-100 text-green-800';
-      case 'reserved':
+      case 'RESERVED':
         return 'bg-yellow-100 text-yellow-800';
-      case 'sold':
+      case 'SOLD':
         return 'bg-red-100 text-red-800';
+      case 'UNDER_CONSTRUCTION':
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -69,42 +97,80 @@ export default function UnitDetailPage() {
 
   const getStatusIcon = (status) => {
     switch (status) {
-      case 'available':
+      case 'AVAILABLE':
         return CheckCircle;
-      case 'reserved':
+      case 'RESERVED':
         return Clock;
-      case 'sold':
+      case 'SOLD':
         return AlertCircle;
+      case 'UNDER_CONSTRUCTION':
+        return Wrench;
       default:
         return Building;
     }
   };
 
+  const getConstructionStageColor = (stage) => {
+    switch (stage) {
+      case 'FOUNDATION':
+        return 'bg-orange-100 text-orange-800';
+      case 'STRUCTURE':
+        return 'bg-blue-100 text-blue-800';
+      case 'ROOFING':
+        return 'bg-purple-100 text-purple-800';
+      case 'INTERIOR':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'FINISHING':
+        return 'bg-green-100 text-green-800';
+      case 'COMPLETED':
+        return 'bg-emerald-100 text-emerald-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getUnitTypeDisplay = (unitType) => {
+    switch (unitType) {
+      case 'STUDIO':
+        return 'Studio';
+      case 'ONE_BEDROOM':
+        return '1 Bedroom';
+      case 'TWO_BEDROOM':
+        return '2 Bedroom';
+      case 'THREE_BEDROOM':
+        return '3 Bedroom';
+      case 'FOUR_BEDROOM':
+        return '4 Bedroom';
+      case 'PENTHOUSE':
+        return 'Penthouse';
+      default:
+        return unitType?.replace('_', ' ') || 'Unknown';
+    }
+  };
+
   const StatusIcon = getStatusIcon(unit.status);
 
-  // Get buyer info if unit is sold or reserved
-  const buyer = unit.soldTo ? Buyers.find(b => b.id === unit.soldTo) : 
-                unit.reservedBy ? Buyers.find(b => b.id === unit.reservedBy) : null;
+  // Find buyer information - using the buyer relationship from the Unit model
+  const buyer = unit?.buyer || null;
 
   const handleReserve = () => {
     if (!session?.user) {
-      router.push('/login');
+      router.push(`/auth/login?redirect=/projects/${project.id}/units/${unit.id}/reserve`);
       return;
     }
     router.push(`/projects/${project.id}/units/${unit.id}/reserve`);
   };
 
   const handlePurchase = () => {
-    if (!session?.user) {
-      router.push('/login');
-      return;
-    }
+    if (!session) {
+      router.push(`/auth/login?redirect=/projects/${project.id}/units/${unit.id}/purchase`);
+    } else {
     router.push(`/projects/${project.id}/units/${unit.id}/purchase`);
-  };
+    }
+};
 
   return (
     <div className="min-h-screen bg-gray-50">
-      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-6">
@@ -133,7 +199,7 @@ export default function UnitDetailPage() {
               <div className="relative h-96">
                 {unit.images && unit.images.length > 0 ? (
                   <img
-                    src={unit.images[activeImageIndex]}
+                    src={`${apiBaseUrl}/images/${unit.images[activeImageIndex]}`}
                     alt={`Unit ${unit.unitNumber}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
@@ -141,17 +207,29 @@ export default function UnitDetailPage() {
                       e.target.nextSibling.style.display = 'flex';
                     }}
                   />
-                ) : null}
+                ) : 
                 <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                   <Building className="w-24 h-24 text-gray-400" />
                 </div>
-                
-                {/* Status Badge */}
-                <div className="absolute top-4 left-4">
+}
+                {/* Status and Featured Badges */}
+                <div className="absolute top-4 left-4 flex flex-col gap-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
                     <StatusIcon className="w-4 h-4 mr-2" />
-                    {unit.status.charAt(0).toUpperCase() + unit.status.slice(1)}
+                    {unit.status?.replace('_', ' ')}
                   </span>
+                  {unit.isFeatured && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-500 text-white">
+                      <Award className="w-4 h-4 mr-2" />
+                      Featured
+                    </span>
+                  )}
+                  {unit.currentStage && (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentStage)}`}>
+                      <Wrench className="w-3 h-3 mr-1" />
+                      {unit.currentStage?.replace('_', ' ')}
+                    </span>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -173,12 +251,11 @@ export default function UnitDetailPage() {
                       <button
                         key={index}
                         onClick={() => setActiveImageIndex(index)}
-                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
-                          activeImageIndex === index ? 'border-blue-500' : 'border-gray-200'
-                        }`}
+                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${activeImageIndex === index ? 'border-blue-500' : 'border-gray-200'
+                          }`}
                       >
                         <img
-                          src={image}
+                          src={`${apiBaseUrl}/images/${image}`}
                           alt={`Unit ${unit.unitNumber} - ${index + 1}`}
                           className="w-full h-full object-cover"
                         />
@@ -188,16 +265,22 @@ export default function UnitDetailPage() {
                 </div>
               )}
             </div>
-                        {/* Unit Details */}
+
+            {/* Unit Details */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <div className="flex items-start justify-between mb-6">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Unit {unit.unitNumber}
-                  </h1>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-3xl font-bold text-gray-900">
+                      Unit {unit.unitNumber}
+                    </h1>
+                    <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm rounded-full font-medium">
+                      {getUnitTypeDisplay(unit.unitType)}
+                    </span>
+                  </div>
                   <div className="flex items-center text-gray-600 mb-4">
                     <MapPin className="w-5 h-5 mr-2" />
-                    {project.name}, {project.location}
+                    {project.name}, {project.subCounty}, {project.county}
                   </div>
                   <p className="text-gray-600 text-lg">{unit.description}</p>
                 </div>
@@ -229,8 +312,8 @@ export default function UnitDetailPage() {
                   <div className="text-sm text-gray-600">Sq Ft</div>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
-                  <Building className="w-8 h-8 text-blue-600 mx-auto mb-2" />
-                  <div className="text-2xl font-bold text-gray-900">{unit.floor}</div>
+                  <Layers className="w-8 h-8 text-blue-600 mx-auto mb-2" />
+                  <div className="text-2xl font-bold text-gray-900">{unit.floor || 'N/A'}</div>
                   <div className="text-sm text-gray-600">Floor</div>
                 </div>
               </div>
@@ -240,7 +323,7 @@ export default function UnitDetailPage() {
                 <div className="mb-8">
                   <h3 className="text-xl font-semibold text-gray-900 mb-4">Features & Amenities</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {unit.features.map((feature, index) => (
+                    {Array.from(unit.features).map((feature, index) => (
                       <div key={index} className="flex items-center">
                         <CheckCircle className="w-5 h-5 text-green-500 mr-3" />
                         <span className="text-gray-700">{feature}</span>
@@ -250,11 +333,36 @@ export default function UnitDetailPage() {
                 </div>
               )}
 
+              {/* Construction Information */}
+              {unit.currentStage && (
+                <div className="mb-8 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                    <Wrench className="w-5 h-5 mr-2 text-blue-600" />
+                    Construction Status
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                       <div>
+                      <div className="text-sm text-gray-600 mb-1">Current Stage</div>
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(unit.currentStage)}`}>
+                        {unit.currentStage?.replace('_', ' ')}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Unit Status</div>
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
+                        <StatusIcon className="w-4 h-4 mr-2" />
+                        {unit.status?.replace('_', ' ')}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Buyer Information (if sold/reserved) */}
-              {buyer && (
+              {buyer && (unit.status === 'SOLD' || unit.status === 'RESERVED') && (
                 <div className="bg-blue-50 rounded-lg p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    {unit.status === 'sold' ? 'Sold To' : 'Reserved By'}
+                    {unit.status === 'SOLD' ? 'Sold To' : 'Reserved By'}
                   </h3>
                   <div className="flex items-center">
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mr-4">
@@ -265,8 +373,50 @@ export default function UnitDetailPage() {
                         {buyer.firstName} {buyer.lastName}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {unit.status === 'sold' ? 'Purchase Date' : 'Reservation Date'}: {' '}
-                        {new Date(unit.status === 'sold' ? unit.soldDate : unit.reservedDate).toLocaleDateString()}
+                        {buyer.email}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        {unit.status === 'SOLD' ? 'Purchase Date' : 'Reservation Date'}: {' '}
+                        {unit.status === 'SOLD' && unit.soldDate ?
+                          new Date(unit.soldDate).toLocaleDateString() :
+                          unit.reservedDate ? new Date(unit.reservedDate).toLocaleDateString() : 'N/A'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Invoice Information */}
+              {unit.invoice && (
+                <div className="bg-green-50 rounded-lg p-6 mt-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <TrendingUp className="w-5 h-5 mr-2 text-green-600" />
+                    Invoice Information
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Invoice Number</div>
+                      <div className="font-medium text-gray-900">#{unit.invoice.invoiceNumber}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Total Amount</div>
+                      <div className="font-medium text-gray-900">{formatPrice(unit.invoice.totalAmount)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Status</div>
+                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        unit.invoice.status === 'PAID' ? 'bg-green-100 text-green-800' :
+                        unit.invoice.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-red-100 text-red-800'
+                      }`}>
+                        {unit.invoice.status}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-600 mb-1">Due Date</div>
+                      <div className="font-medium text-gray-900">
+                        {unit.invoice.dueDate ? new Date(unit.invoice.dueDate).toLocaleDateString() : 'N/A'}
                       </div>
                     </div>
                   </div>
@@ -285,12 +435,63 @@ export default function UnitDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Unit Timeline */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4">Unit Timeline</h3>
+              <div className="space-y-4">
+                {unit.createdAt && (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-blue-500 rounded-full mr-4"></div>
+                    <div>
+                      <div className="font-medium text-gray-900">Unit Listed</div>
+                      <div className="text-sm text-gray-600">
+                        {new Date(unit.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {unit.reservedDate && (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-yellow-500 rounded-full mr-4"></div>
+                    <div>
+                      <div className="font-medium text-gray-900">Unit Reserved</div>
+                      <div className="text-sm text-gray-600">
+                        {new Date(unit.reservedDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {unit.soldDate && (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-4"></div>
+                    <div>
+                      <div className="font-medium text-gray-900">Unit Sold</div>
+                      <div className="text-sm text-gray-600">
+                        {new Date(unit.soldDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {unit.updatedAt && (
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-gray-400 rounded-full mr-4"></div>
+                    <div>
+                      <div className="font-medium text-gray-900">Last Updated</div>
+                      <div className="text-sm text-gray-600">
+                        {new Date(unit.updatedAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Action Card */}
-            <div className="bg-white rounded-xl shadow-sm border p-6 sticky top-6">
+            <div className="bg-white rounded-xl shadow-sm border p-6 top-6">
               <div className="text-center mb-6">
                 <div className="text-3xl font-bold text-gray-900 mb-2">
                   {formatPrice(unit.price)}
@@ -298,9 +499,12 @@ export default function UnitDetailPage() {
                 <div className="text-gray-600">
                   {formatPrice(Math.round(unit.price / unit.sqft))}/sq ft
                 </div>
+                <div className="text-sm text-blue-600 font-medium mt-2">
+                  {getUnitTypeDisplay(unit.unitType)}
+                </div>
               </div>
 
-              {unit.status === 'available' && (
+              {unit.status === 'AVAILABLE' && (
                 <div className="space-y-3">
                   <button
                     onClick={handlePurchase}
@@ -310,21 +514,15 @@ export default function UnitDetailPage() {
                   </button>
                   <button
                     onClick={handleReserve}
-                    className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-semibold hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all shadow-sm"
                   >
                     Reserve Unit
                   </button>
-                  <button
-                    onClick={() => setShowCalculator(!showCalculator)}
-                    className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-lg font-semibold hover:bg-gray-200 transition-colors flex items-center justify-center"
-                  >
-                    <Calculator className="w-5 h-5 mr-2" />
-                    Mortgage Calculator
-                  </button>
+
                 </div>
               )}
 
-              {unit.status === 'reserved' && (
+              {unit.status === 'RESERVED' && (
                 <div className="text-center">
                   <div className="inline-flex items-center px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium mb-4">
                     <Clock className="w-4 h-4 mr-2" />
@@ -333,10 +531,15 @@ export default function UnitDetailPage() {
                   <p className="text-gray-600 text-sm">
                     This unit is currently reserved. Contact us to be notified if it becomes available.
                   </p>
+                  {unit.reservedDate && (
+                    <p className="text-gray-500 text-xs mt-2">
+                      Reserved on {new Date(unit.reservedDate).toLocaleDateString()}
+                    </p>
+                  )}
                 </div>
               )}
 
-              {unit.status === 'sold' && (
+              {unit.status === 'SOLD' && (
                 <div className="text-center">
                   <div className="inline-flex items-center px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium mb-4">
                     <AlertCircle className="w-4 h-4 mr-2" />
@@ -345,6 +548,37 @@ export default function UnitDetailPage() {
                   <p className="text-gray-600 text-sm">
                     This unit has been sold. Browse other available units in this project.
                   </p>
+                  {unit.soldDate && (
+                    <p className="text-gray-500 text-xs mt-2">
+                      Sold on {new Date(unit.soldDate).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {unit.status === 'UNDER_CONSTRUCTION' && (
+                <div className="text-center">
+                  <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-4">
+                    <Wrench className="w-4 h-4 mr-2" />
+                    Under Construction
+                  </div>
+                  <p className="text-gray-600 text-sm mb-4">
+                    This unit is currently under construction.
+                  </p>
+                  {unit.currentStage && (
+                    <div className="text-center mb-4">
+                      <div className="text-sm text-gray-600 mb-1">Current Stage</div>
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getConstructionStageColor(unit.currentStage)}`}>
+                        {unit.currentStage?.replace('_', ' ')}
+                      </div>
+                    </div>
+                  )}
+                  <button
+                    onClick={handleReserve}
+                    className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-lg font-semibold hover:bg-blue-50 transition-colors"
+                  >
+                    Reserve for Future
+                  </button>
                 </div>
               )}
 
@@ -366,6 +600,42 @@ export default function UnitDetailPage() {
                 <MortgageCalculator unitPrice={unit.price} />
               </div>
             )}
+
+            {/* Unit Highlights */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Unit Highlights</h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Unit Type</span>
+                  <span className="font-medium text-gray-900">{getUnitTypeDisplay(unit.unitType)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Floor</span>
+                  <span className="font-medium text-gray-900">{unit.floor || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Price per sq ft</span>
+                  <span className="font-medium text-gray-900">{formatPrice(Math.round(unit.price / unit.sqft))}</span>
+                </div>
+                {unit.isFeatured && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Featured Unit</span>
+                    <span className="inline-flex items-center px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                      <Award className="w-3 h-3 mr-1" />
+                      Yes
+                    </span>
+                  </div>
+                )}
+                {unit.currentStage && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">Construction Stage</span>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentStage)}`}>
+                      {unit.currentStage?.replace('_', ' ')}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Contact Information */}
             <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -392,6 +662,32 @@ export default function UnitDetailPage() {
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">About {project.name}</h3>
               <p className="text-gray-600 text-sm mb-4">{project.description}</p>
+              
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Developer</span>
+                  <span className="font-medium text-gray-900">{project.developerName || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Location</span>
+                  <span className="font-medium text-gray-900">{project.subCounty}, {project.county}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-600">Status</span>
+                  <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(project.status)}`}>
+                    {project.status?.replace('_', ' ')}
+                  </span>
+                </div>
+                {project.targetCompletionDate && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">Target Completion</span>
+                    <span className="font-medium text-gray-900">
+                      {new Date(project.targetCompletionDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <button
                 onClick={() => router.push(`/projects/${project.id}`)}
                 className="text-blue-600 hover:text-blue-700 font-medium text-sm"
@@ -399,12 +695,88 @@ export default function UnitDetailPage() {
                 View Project Details →
               </button>
             </div>
+
+            {/* Similar Units */}
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Similar Units</h3>
+              <SimilarUnits currentUnit={unit} project={project} />
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+// Similar Units Component
+const SimilarUnits = ({ currentUnit, project }) => {
+  const { units } = useUnits();
+  const router = useRouter();
+
+  const similarUnits = useMemo(() => {
+    if (!units || !Array.isArray(units)) return [];
+    
+    return units
+      .filter(unit => 
+        unit.projectId === project.id && 
+        unit.id !== currentUnit.id &&
+        (unit.unitType === currentUnit.unitType || 
+         unit.bedrooms === currentUnit.bedrooms ||
+         Math.abs(unit.price - currentUnit.price) < currentUnit.price * 0.2)
+      )
+      .slice(0, 3);
+  }, [units, currentUnit, project]);
+
+  if (similarUnits.length === 0) {
+    return (
+      <div className="text-center py-4">
+        <Building className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-600 text-sm">No similar units found</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {similarUnits.map(unit => (
+        <div
+          key={unit.id}
+          onClick={() => router.push(`/projects/${project.id}/units/${unit.id}`)}
+          className="p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 cursor-pointer transition-colors"
+        >
+          <div className="flex items-center justify-between mb-2">
+            <div className="font-medium text-gray-900">Unit {unit.unitNumber}</div>
+            <div className="text-sm font-bold text-gray-900">{formatPrice(unit.price)}</div>
+          </div>
+          <div className="flex items-center justify-between text-sm text-gray-600">
+            <div className="flex items-center space-x-3">
+              <span className="flex items-center">
+                <Bed className="w-3 h-3 mr-1" />
+                {unit.bedrooms}
+              </span>
+              <span className="flex items-center">
+                <Bath className="w-3 h-3 mr-1" />
+                {unit.bathrooms}
+              </span>
+              <span className="flex items-center">
+                <Square className="w-3 h-3 mr-1" />
+                {unit.sqft}
+              </span>
+            </div>
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+              unit.status === 'AVAILABLE' ? 'bg-green-100 text-green-800' :
+              unit.status === 'RESERVED' ? 'bg-yellow-100 text-yellow-800' :
+              unit.status === 'SOLD' ? 'bg-red-100 text-red-800' :
+              'bg-blue-100 text-blue-800'
+            }`}>
+              {unit.status?.replace('_', ' ')}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 // Mortgage Calculator Component
 const MortgageCalculator = ({ unitPrice }) => {
@@ -417,14 +789,14 @@ const MortgageCalculator = ({ unitPrice }) => {
     const principal = loanAmount;
     const monthlyRate = interestRate / 100 / 12;
     const numberOfPayments = loanTerm * 12;
-    
+
     if (monthlyRate === 0) {
       return principal / numberOfPayments;
     }
-    
-    const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) / 
-                          (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
-    
+
+    const monthlyPayment = principal * (monthlyRate * Math.pow(1 + monthlyRate, numberOfPayments)) /
+      (Math.pow(1 + monthlyRate, numberOfPayments) - 1);
+
     return monthlyPayment;
   };
 
@@ -458,6 +830,9 @@ const MortgageCalculator = ({ unitPrice }) => {
           }}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
+        <div className="text-xs text-gray-500 mt-1">
+          {((downPayment / unitPrice) * 100).toFixed(1)}% of home price
+        </div>
       </div>
 
       <div>
@@ -496,9 +871,13 @@ const MortgageCalculator = ({ unitPrice }) => {
             {formatPrice(monthlyPayment)}
           </span>
         </div>
-        <div className="flex justify-between items-center text-sm text-gray-600">
-                    <span>Total Interest:</span>
+        <div className="flex justify-between items-center text-sm text-gray-600 mb-2">
+          <span>Total Interest:</span>
           <span>{formatPrice((monthlyPayment * loanTerm * 12) - loanAmount)}</span>
+        </div>
+        <div className="flex justify-between items-center text-sm text-gray-600">
+          <span>Total Cost:</span>
+          <span>{formatPrice((monthlyPayment * loanTerm * 12) + downPayment)}</span>
         </div>
       </div>
     </div>
