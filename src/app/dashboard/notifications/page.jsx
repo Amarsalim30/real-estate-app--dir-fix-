@@ -1,4 +1,4 @@
-                                    'use client';
+'use client';
 import React, { useState, useEffect } from 'react';
 import { 
     Bell, 
@@ -15,9 +15,10 @@ import {
     Settings
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import DashboardLayout from '@/components/layout/dashboard-layout';
 import { useRouter } from 'next/navigation';
 
-export default function NotificationsPage() {
+export  function NotificationsContent() {
     const router = useRouter();
     const { data: session } = useSession();
     const [searchTerm, setSearchTerm] = useState('');
@@ -125,15 +126,15 @@ export default function NotificationsPage() {
     const getNotificationColorClass = (type) => {
         switch (type) {
             case 'success':
-                return 'notification-icon-success';
+                return 'bg-green-50 border-green-200 text-green-600';
             case 'info':
-                return 'notification-icon-info';
+                return 'bg-blue-50 border-blue-200 text-blue-600';
             case 'warning':
-                return 'notification-icon-warning';
+                return 'bg-yellow-50 border-yellow-200 text-yellow-600';
             case 'error':
-                return 'notification-icon-error';
+                return 'bg-red-50 border-red-200 text-red-600';
             default:
-                return 'notification-icon-default';
+                return 'bg-gray-50 border-gray-200 text-gray-600';
         }
     };
 
@@ -204,14 +205,14 @@ export default function NotificationsPage() {
     const totalCount = notifications.length;
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
-            <div className="max-w-6xl mx-auto p-6">
+        <div className="min-h-screen bg-gray-50">
+            <div className="max-w-6xl mx-auto p-4 sm:p-6">
                 {/* Header */}
                 <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                                <Bell className="w-8 h-8 text-teal-600" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+                        <div className="mb-4 sm:mb-0">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 flex items-center gap-3">
+                                <Bell className="w-7 h-7 sm:w-8 sm:h-8 text-teal-600" />
                                 Notifications
                             </h1>
                             <p className="text-gray-600 mt-2">
@@ -221,17 +222,20 @@ export default function NotificationsPage() {
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={markAllAsRead}
-                                className={`flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors ${unreadCount === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all duration-200 font-medium ${
+                                    unreadCount === 0 ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-md'
+                                }`}
                                 disabled={unreadCount === 0}
                             >
                                 <CheckCheck className="w-4 h-4" />
-                                Mark All Read
+                                <span className="hidden sm:inline">Mark All Read</span>
+                                <span className="sm:hidden">Mark All</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Search and Filters */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
                         <div className="flex flex-col lg:flex-row gap-4">
                             {/* Search */}
                             <div className="relative flex-1">
@@ -239,7 +243,7 @@ export default function NotificationsPage() {
                                 <input
                                     type="text"
                                     placeholder="Search notifications..."
-                                    className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                    className="w-full pl-10 pr-4 py-2.5 border placeholder-gray-400 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200"
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
                                 />
@@ -249,7 +253,7 @@ export default function NotificationsPage() {
                             <select
                                 value={filterType}
                                 onChange={(e) => setFilterType(e.target.value)}
-                                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                className=" placeholder-gray-400 text-gray-500  px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 bg-white"
                             >
                                 <option value="all">All Types</option>
                                 <option value="success">Success</option>
@@ -262,7 +266,7 @@ export default function NotificationsPage() {
                             <select
                                 value={filterRead}
                                 onChange={(e) => setFilterRead(e.target.value)}
-                                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+                                className="placeholder-gray-400 text-gray-500 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-all duration-200 bg-white"
                             >
                                 <option value="all">All Status</option>
                                 <option value="unread">Unread</option>
@@ -274,30 +278,29 @@ export default function NotificationsPage() {
 
                 {/* Bulk Actions */}
                 {selectedNotifications.length > 0 && (
-                    <div className="mb-6 bulk-actions-bar">
-                        <div className="flex items-center justify-between">
+                    <div className="mb-6 bg-teal-50 border border-teal-200 rounded-xl p-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <span className="text-teal-700 font-medium">
                                 {selectedNotifications.length} notification{selectedNotifications.length > 1 ? 's' : ''} selected
                             </span>
                             <div className="flex items-center gap-3">
                                 <button
-                                   
                                     onClick={markSelectedAsRead}
-                                    className="flex items-center gap-2 px-3 py-1 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors text-sm"
+                                    className="flex items-center gap-2 px-3 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-all duration-200 text-sm font-medium hover:shadow-md"
                                 >
                                     <Check className="w-4 h-4" />
                                     Mark as Read
                                 </button>
                                 <button
                                     onClick={deleteSelected}
-                                    className="flex items-center gap-2 px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+                                    className="flex items-center gap-2 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200 text-sm font-medium hover:shadow-md"
                                 >
                                     <Trash2 className="w-4 h-4" />
                                     Delete
                                 </button>
                                 <button
                                     onClick={deselectAll}
-                                    className="text-teal-600 hover:text-teal-700 text-sm"
+                                    className="text-teal-600 hover:text-teal-700 text-sm font-medium transition-colors duration-200"
                                 >
                                     Deselect All
                                 </button>
@@ -308,17 +311,17 @@ export default function NotificationsPage() {
 
                 {/* Select All/None */}
                 {filteredNotifications.length > 0 && (
-                    <div className="mb-4 flex items-center justify-between">
+                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
                             <button
                                 onClick={selectAll}
-                                className="text-sm text-teal-600 hover:text-teal-700"
+                                className="text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors duration-200"
                             >
                                 Select All
                             </button>
                             <button
                                 onClick={deselectAll}
-                                className="text-sm text-gray-600 hover:text-gray-700"
+                                className="text-sm text-gray-600 hover:text-gray-700 font-medium transition-colors duration-200"
                             >
                                 Select None
                             </button>
@@ -332,7 +335,7 @@ export default function NotificationsPage() {
                 {/* Notifications List */}
                 <div className="space-y-4">
                     {filteredNotifications.length === 0 ? (
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200/50 p-12 text-center">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
                             <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">No notifications found</h3>
                             <p className="text-gray-500">
@@ -346,17 +349,17 @@ export default function NotificationsPage() {
                         filteredNotifications.map((notification) => (
                             <div
                                 key={notification.id}
-                                className={`group notification-card ${
+                                className={`group bg-white rounded-xl shadow-sm border transition-all duration-200 hover:shadow-md ${
                                     !notification.read 
-                                        ? 'notification-card-unread' 
-                                        : 'notification-card-read'
+                                        ? 'border-l-4 border-l-teal-500 border-gray-200' 
+                                        : 'border-gray-200'
                                 } ${
                                     selectedNotifications.includes(notification.id)
-                                        ? 'notification-card-selected'
+                                        ? 'ring-2 ring-teal-500 border-teal-300'
                                         : ''
                                 }`}
                             >
-                                <div className="p-6">
+                                <div className="p-4 sm:p-6">
                                     <div className="flex items-start gap-4">
                                         {/* Checkbox */}
                                         <div className="flex items-center pt-1">
@@ -364,40 +367,40 @@ export default function NotificationsPage() {
                                                 type="checkbox"
                                                 checked={selectedNotifications.includes(notification.id)}
                                                 onChange={() => toggleSelectNotification(notification.id)}
-                                                className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                                                className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 focus:ring-2 transition-all duration-200"
                                             />
                                         </div>
 
                                         {/* Icon */}
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 border ${getNotificationColorClass(notification.type)}`}>
+                                        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 border-2 ${getNotificationColorClass(notification.type)}`}>
                                             {getNotificationIcon(notification.type)}
                                         </div>
 
                                         {/* Content */}
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-start justify-between mb-2">
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="font-semibold text-gray-900 text-lg">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-3 mb-2">
+                                                        <h3 className="font-semibold text-gray-900 text-base sm:text-lg truncate">
                                                             {notification.title}
                                                         </h3>
                                                         {!notification.read && (
-                                                            <div className="w-2 h-2 bg-teal-500 rounded-full"></div>
+                                                            <div className="w-2 h-2 bg-teal-500 rounded-full flex-shrink-0 animate-pulse"></div>
                                                         )}
                                                     </div>
-                                                    <span className="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full mb-2">
+                                                    <span className="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full mb-3 font-medium">
                                                         {notification.category}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center gap-2 ml-4">
-                                                    <span className="text-sm text-gray-500">
+                                                <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+                                                    <span className="text-sm text-gray-500 whitespace-nowrap">
                                                         {notification.time}
                                                     </span>
-                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                                         {!notification.read && (
                                                             <button
                                                                 onClick={() => markAsRead(notification.id)}
-                                                                className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-colors"
+                                                                className="p-2 text-gray-400 hover:text-teal-600 hover:bg-teal-50 rounded-lg transition-all duration-200"
                                                                 title="Mark as read"
                                                             >
                                                                 <Check className="w-4 h-4" />
@@ -405,7 +408,7 @@ export default function NotificationsPage() {
                                                         )}
                                                         <button
                                                             onClick={() => deleteNotification(notification.id)}
-                                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
                                                             title="Delete notification"
                                                         >
                                                             <X className="w-4 h-4" />
@@ -413,7 +416,7 @@ export default function NotificationsPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-gray-600 leading-relaxed">
+                                            <p className="text-gray-600 leading-relaxed text-sm sm:text-base">
                                                 {notification.message}
                                             </p>
                                         </div>
@@ -424,60 +427,60 @@ export default function NotificationsPage() {
                     )}
                 </div>
 
-                {/* Load More Button (if you have pagination) */}
+                {/* Load More Button */}
                 {filteredNotifications.length > 0 && filteredNotifications.length >= 10 && (
                     <div className="mt-8 text-center">
-                        <button className="px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                        <button className="px-6 py-3 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 hover:shadow-md transition-all duration-200 font-medium">
                             Load More Notifications
                         </button>
                     </div>
                 )}
 
                 {/* Settings Panel */}
-                <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-200/50 p-6">
-                    <div className="flex items-center gap-3 mb-4">
+                <div className="mt-12 bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                    <div className="flex items-center gap-3 mb-6">
                         <Settings className="w-5 h-5 text-gray-600" />
-                        <h3 className="font-semibold text-gray-900">Notification Settings</h3>
+                        <h3 className="font-semibold text-gray-900 text-lg">Notification Settings</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                             <div>
                                 <p className="font-medium text-gray-900">Email Notifications</p>
                                 <p className="text-sm text-gray-600">Receive notifications via email</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" className="sr-only peer" defaultChecked />
-                                <div className="settings-toggle"></div>
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
                             </label>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                             <div>
                                 <p className="font-medium text-gray-900">Push Notifications</p>
                                 <p className="text-sm text-gray-600">Receive browser notifications</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" className="sr-only peer" defaultChecked />
-                                <div className="settings-toggle"></div>
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
                             </label>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                             <div>
                                 <p className="font-medium text-gray-900">Property Updates</p>
                                 <p className="text-sm text-gray-600">Updates about your properties</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" className="sr-only peer" defaultChecked />
-                                <div className="settings-toggle"></div>
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
                             </label>
                         </div>
-                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
                             <div>
                                 <p className="font-medium text-gray-900">Marketing Updates</p>
                                 <p className="text-sm text-gray-600">News and promotional content</p>
                             </div>
                             <label className="relative inline-flex items-center cursor-pointer">
                                 <input type="checkbox" className="sr-only peer" />
-                                <div className="settings-toggle"></div>
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-teal-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-600"></div>
                             </label>
                         </div>
                     </div>
@@ -485,4 +488,33 @@ export default function NotificationsPage() {
             </div>
         </div>
     );
+}
+
+export default function NotificationsPage(){
+      const { data: session, status } = useSession();
+      const router = useRouter();
+    
+       useEffect(() => {
+        if (status === "unauthenticated") {
+          router.push("/login");
+        }
+      },[status, session, router])
+    
+    
+      if (status === 'loading') {
+        return (
+          <DashboardLayout>
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          </DashboardLayout>
+        );
+      }
+    
+    
+      return (
+        <DashboardLayout>
+          <NotificationsContent />
+        </DashboardLayout>
+      );
 }

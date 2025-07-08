@@ -34,6 +34,7 @@ export default function UnitDetailPage() {
   const router = useRouter();
   const { units, loading: unitsLoading } = useUnits();
   const { projects, loading: projectsLoading } = useProjects();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   const unit = useMemo(() => {
     if (!units || !Array.isArray(units) || !params?.unitId) {
@@ -125,10 +126,15 @@ export default function UnitDetailPage() {
         {/* Unit Header */}
         <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
           <div className="relative h-96">
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-              <Building className="w-24 h-24 text-blue-400" />
-            </div>
 
+    
+            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
+              <img
+                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                  alt={`Unit ${unit.unitNumber}`}
+                  className="w-full h-32 object-cover" />
+              {unit.images.length = 0 && (<Building className="w-24 h-24 text-blue-400" />)};
+            </div> 
             {/* Overlay */}
             <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
               <div className="p-8 text-white">
@@ -142,32 +148,30 @@ export default function UnitDetailPage() {
                       Featured
                     </span>
                   )}
-                  {unit.currentConstructionStage && (
+                  {/* {unit.currentConstructionStage && (
                     <span className="ml-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium">
                       <Wrench className="w-4 h-4 mr-2 inline" />
                       {ConstructionStages[unit.currentConstructionStage]?.label}
                     </span>
-                  )}
+                  )} */}
                 </div>
                 
-                <h1 className="text-4xl font-bold mb-2">Unit {unit.unitNumber}</h1>
-                <div className="text-xl text-blue-100 mb-2">{getUnitTypeDisplay(unit.unitType)}</div>
+                {/* <div className="text-xl text-blue-100 mb-2">{getUnitTypeDisplay(unit.unitType)}</div> */}
                 
-                {project && (
+                {/* {project && (
                   <div className="flex items-center text-lg mb-4">
                     <MapPin className="w-5 h-5 mr-2" />
                     {project.name}, {project.subCounty}, {project.county}
                   </div>
-                )}
+                )} */}
                 
-                <p className="text-lg opacity-90 max-w-2xl">{unit.description}</p>
                 
-                <div className="mt-4 text-3xl font-bold">
+                {/* <div className="mt-4 text-3xl font-bold">
                   {formatPrice(unit.price)}
                   <span className="text-lg font-normal text-blue-200 ml-2">
                     ({formatPrice(Math.round(unit.price / unit.sqft))}/sq ft)
                   </span>
-                </div>
+                </div> */}
               </div>
 
               {/* Action Buttons */}
@@ -189,7 +193,13 @@ export default function UnitDetailPage() {
           <div className="lg:col-span-2 space-y-8">
             {/* Unit Specifications */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Unit Specifications</h2>
+              <div className="border-b border-gray-200 ">
+
+                              <h1 className="text-gray-900 text-4xl font-bold mb-2">Unit {unit.unitNumber}</h1>
+                                              <p className="text-gray-600 text-lg opacity-90 max-w-2xl">{unit.description}</p>
+
+                              </div>
+              <h2 className="mt-6 text-2xl font-bold text-gray-900 mb-6">Unit Specifications</h2>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
@@ -319,10 +329,10 @@ export default function UnitDetailPage() {
               </p>
               
               <div className="space-y-4">
-                <button className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                <button className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium" onClick={() =>     router.push(`/projects/${project.id}/units/${unit.id}/purchase`)}>
                   Purchase Now
                 </button>
-                <button
+                <button onClick={() => router.push(`/projects/${project.id}/units/${unit.id}/reserve`)}
                   className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-semibold hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all shadow-sm">
                   Reserve 
                 </button>

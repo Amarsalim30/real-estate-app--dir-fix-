@@ -47,7 +47,7 @@ export default function LoginForm() {
         const session = await sessionRes.json();
 
         if (session?.user?.role === "ADMIN") {
-          router.push("/dashboard/admin");
+          router.push("/dashboard");
         } else {
           router.push("/dashboard");
         }

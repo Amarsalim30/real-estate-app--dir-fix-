@@ -1,13 +1,53 @@
-import api from '../api';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+
+const api = {
+  get: async (url, options = {}) => {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response.json();
+  },
+  
+  post: async (url, data, options = {}) => {
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    return response.json();
+  }
+};
 
 export const buyersApi = {
   // Get all buyers
   getAll: async (params = {}) => {
     try {
-      const response = await api.get('/buyers', { params });
-      return response.data;
+      const queryString = new URLSearchParams(params).toString();
+      const url = `/buyers${queryString ? `?${queryString}` : ''}`;
+      const response = await api.get(url);
+      
+      // Handle both direct array and wrapped response
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch buyers');
+      throw new Error(error.message || 'Failed to fetch buyers');
     }
   },
 
@@ -15,9 +55,9 @@ export const buyersApi = {
   getById: async (id) => {
     try {
       const response = await api.get(`/buyers/${id}`);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch buyer');
+      throw new Error(error.message || 'Failed to fetch buyer');
     }
   },
 
@@ -25,9 +65,9 @@ export const buyersApi = {
   create: async (buyerData) => {
     try {
       const response = await api.post('/buyers', buyerData);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to create buyer');
+      throw new Error(error.message || 'Failed to create buyer');
     }
   },
 
@@ -35,9 +75,9 @@ export const buyersApi = {
   update: async (id, buyerData) => {
     try {
       const response = await api.put(`/buyers/${id}`, buyerData);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to update buyer');
+      throw new Error(error.message || 'Failed to update buyer');
     }
   },
 
@@ -45,9 +85,9 @@ export const buyersApi = {
   delete: async (id) => {
     try {
       const response = await api.delete(`/buyers/${id}`);
-      return response.data;
+      return response.data || response;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to delete buyer');
+      throw new Error(error.message || 'Failed to delete buyer');
     }
   },
 

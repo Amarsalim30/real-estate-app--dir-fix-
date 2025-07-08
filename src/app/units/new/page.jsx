@@ -1,4 +1,4 @@
-                          "use client";
+"use client";
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -749,7 +749,7 @@ export default function NewUnitPage() {
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
                         Location
                       </label>
-                      <p className="text-sm text-gray-900 mt-1">{selectedProject.location || `${selectedProject.city}, ${selectedProject.state}`}</p>
+                      <p className="text-sm text-gray-900 mt-1">{selectedProject.subCounty || `${selectedProject.county}, ${selectedProject.state}`}</p>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">

@@ -1,19 +1,18 @@
 'use client';
-import { useState, useMemo ,useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-import {  InvoiceStatuses } from '@/data/invoices';
-// import { Units } from '@/data/units';
-// import { Buyers } from '@/data/buyers';
-// import { Projects } from '@/data/projects';
+import StatusBadge from '@/components/ui/status-badge';
+import { InvoiceStatuses } from '@/data/invoices';
 
 import { useBuyers } from '@/hooks/useBuyers';
 import { useUnits } from '@/hooks/useUnits';
 import { useProjects } from '@/hooks/useProjects';
 import { useInvoices } from '@/hooks/useInvoices';
 
-import { formatPrice } from '@/utils/format';
+import { formatPrice, formatDate } from '@/utils/format';
+import { isInvoiceOverdue, getInvoiceDisplayStatus, getStatusSortOrder } from '@/utils/invoice-helpers';
 import { ROLES } from '@/lib/roles';
 import { 
   FileText,
@@ -21,7 +20,6 @@ import {
   Filter,
   Download,
   Eye,
-  Edit,
   Plus,
   Calendar,
   DollarSign,
@@ -37,72 +35,24 @@ import {
   Mail
 } from 'lucide-react';
 
-const StatusBadge = ({ status }) => {
-  const getStatusConfig = (status) => {
-    switch (status) {
-      case InvoiceStatuses.PAID:
-        return {
-          color: 'bg-green-100 text-green-800',
-          icon: CheckCircle,
-          label: 'Paid'
-        };
-      case InvoiceStatuses.PENDING:
-        return {
-          color: 'bg-yellow-100 text-yellow-800',
-          icon: Clock,
-          label: 'Pending'
-        };
-      case InvoiceStatuses.OVERDUE:
-        return {
-          color: 'bg-red-100 text-red-800',
-          icon: AlertTriangle,
-          label: 'Overdue'
-        };
-      case InvoiceStatuses.CANCELLED:
-        return {
-          color: 'bg-gray-100 text-gray-800',
-          icon: X,
-          label: 'Cancelled'
-        };
-      default:
-        return {
-          color: 'bg-gray-100 text-gray-800',
-          icon: FileText,
-          label: status
-        };
-    }
-  };
-
-  const config = getStatusConfig(status);
-  const Icon = config.icon;
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-      <Icon className="w-3 h-3 mr-1" />
-      {config.label}
-    </span>
-  );
-};
-
 const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
   const unit = units?.find(u => u.id === invoice.unitId);
-  const buyer = buyers?.find(b => b.id === invoice.buyerId);
-  const project = projects?.find(p => p.id === invoice.projectId);
+  const buyer = buyers?.find(b => b.id == invoice.buyerId); // Fixed: use loose comparison
+  const project = projects?.find(p => p.id === unit.projectId);
 
-  const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
-                   new Date(invoice.dueDate) < new Date();
+  const displayStatus = getInvoiceDisplayStatus(invoice);
 
   return (
-    <tr className="hover:bg-gray-50 border-b border-gray-200">
+    <tr key={invoice.id} className="hover:bg-gray-50 border-b border-gray-200">
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center">
           <FileText className="w-5 h-5 text-gray-400 mr-3" />
           <div>
             <div className="text-sm font-medium text-gray-900">
-              {invoice.invoiceNumber}
+              #{invoice.invoiceNumber}
             </div>
             <div className="text-sm text-gray-500">
-              {new Date(invoice.issueDate).toLocaleDateString()}
+              {formatDate(invoice.issueDate)}
             </div>
           </div>
         </div>
@@ -116,10 +66,12 @@ const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
             </div>
             <div>
               <div className="text-sm font-medium text-gray-900">
-                {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
+                {buyer ? `${buyer.firstName} ${buyer.lastName}` : (
+                  <span className="text-red-500 italic">Missing Buyer Profile</span>
+                )}
               </div>
               <div className="text-sm text-gray-500">
-                {buyer?.email}
+                {buyer?.email || 'No email available'}
               </div>
             </div>
           </div>
@@ -145,12 +97,12 @@ const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
           {formatPrice(invoice.totalAmount)}
         </div>
         <div className="text-sm text-gray-500">
-          Due: {new Date(invoice.dueDate).toLocaleDateString()}
+          Due: {formatDate(invoice.dueDate)}
         </div>
       </td>
       
       <td className="px-6 py-4 whitespace-nowrap">
-        <StatusBadge status={isOverdue ? InvoiceStatuses.OVERDUE : invoice.status} />
+        <StatusBadge status={displayStatus} />
       </td>
       
       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -163,8 +115,9 @@ const InvoiceRow = ({ invoice, onView, isAdmin, buyers, units, projects }) => {
             <Eye className="w-4 h-4" />
           </button>
           <button
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-            title="Download PDF"
+            className="text-gray-400 hover:text-gray-600 p-1 rounded opacity-50 cursor-not-allowed"
+            title="Download PDF - Coming Soon"
+            disabled
           >
             <Download className="w-4 h-4" />
           </button>
@@ -191,60 +144,61 @@ function InvoicesContent() {
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
-  // Get user's buyer ID for filtering
-// Get user's buyer ID for filtering
-const getUserBuyerId = () => {
-  if (session?.user?.buyerId) {
-    return session.user.buyerId;
-  }
-  
-  // Fallback: find buyer by email if buyerId not in session
-  const buyer = buyers?.find(b => b.email === session?.user?.email);
-  return buyer?.id || null;
-};
+  // Fixed: Calculate userBuyerId with proper dependencies
+  const userBuyerId = useMemo(() => {
+    if (!session?.user || !buyers) return null;
+    
+    if (session.user.buyerId) {
+      return Number(session.user.buyerId);
+    }
+    
+    const buyer = buyers.find(b => b.email === session.user.email);
+    return buyer?.id || null;
+  }, [session, buyers]);
 
+  // Add this after the hooks in InvoicesContent function
+useEffect(() => {
+  console.log('Debug - Buyers:', buyers);
+  console.log('Debug - Invoices:', invoices);
+  console.log('Debug - Is Admin:', isAdmin);
+  console.log('Debug - User Buyer ID:', userBuyerId);
+}, [buyers, invoices, isAdmin, userBuyerId]);
 
-  const userBuyerId = getUserBuyerId();
+  // Fixed: Get filtered invoices with proper comparison
+  const getFilteredInvoices = () => {
+    if (!invoices) return [];
+    if (isAdmin) {
+      return invoices;
+    } else {
+      return invoices.filter(invoice => invoice.buyerId == userBuyerId); // Fixed: use loose comparison
+    }
+  };
 
-  // Get filtered invoices based on user role
-// Get filtered invoices based on user role
-const getFilteredInvoices = () => {
-  if (!invoices) return []; // Handle loading state
-  if (isAdmin) {
-    return invoices; // Admin sees all invoices
-  } else {
-    // Regular users only see their own invoices
-    return invoices.filter(invoice => invoice.buyerId === userBuyerId);
-  }
-};
+  // Filter and sort invoices
+  const filteredInvoices = useMemo(() => {
+    let filtered = getFilteredInvoices();
 
-
-// Filter and sort invoices
-const filteredInvoices = useMemo(() => {
-  let filtered = getFilteredInvoices();
-
-  // Filter by search term
-  if (searchTerm) {
-    filtered = filtered.filter(invoice => {
-      const buyer = buyers?.find(b => b.id === invoice.buyerId);
-      const unit = units?.find(u => u.id === invoice.unitId);
-      const project = projects?.find(p => p.id === invoice.projectId);
-      
-      return (
-        invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    });
-  }
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(invoice => {
+        const buyer = buyers?.find(b => b.id == invoice.buyerId);
+        const unit = units?.find(u => u.id === invoice.unitId);
+        const project = projects?.find(p => p.id === invoice.projectId);
+        
+        return (
+          invoice.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+          (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+      });
+    }
 
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(invoice => {
         if (statusFilter === 'overdue') {
-          return invoice.status === InvoiceStatuses.PENDING && 
-                 new Date(invoice.dueDate) < new Date();
+          return isInvoiceOverdue(invoice);
         }
         return invoice.status === statusFilter;
       });
@@ -275,7 +229,7 @@ const filteredInvoices = useMemo(() => {
       );
     }
 
-    // Sort invoices
+    // Fixed: Sort invoices with proper status ordering
     filtered.sort((a, b) => {
       let aValue, bValue;
       
@@ -293,8 +247,9 @@ const filteredInvoices = useMemo(() => {
           bValue = new Date(b.dueDate);
           break;
         case 'status':
-          aValue = a.status;
-          bValue = b.status;
+          const statusOrder = getStatusSortOrder();
+          aValue = statusOrder[getInvoiceDisplayStatus(a)] || 999;
+          bValue = statusOrder[getInvoiceDisplayStatus(b)] || 999;
           break;
         default:
           aValue = new Date(a.issueDate);
@@ -316,9 +271,7 @@ const filteredInvoices = useMemo(() => {
     const total = filteredInvoices.length;
     const paid = filteredInvoices.filter(i => i.status === InvoiceStatuses.PAID).length;
     const pending = filteredInvoices.filter(i => i.status === InvoiceStatuses.PENDING).length;
-    const overdue = filteredInvoices.filter(i => 
-      i.status === InvoiceStatuses.PENDING && new Date(i.dueDate) < new Date()
-    ).length;
+    const overdue = filteredInvoices.filter(i => isInvoiceOverdue(i)).length;
     const cancelled = filteredInvoices.filter(i => i.status === InvoiceStatuses.CANCELLED).length;
     
     const totalAmount = filteredInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
@@ -355,46 +308,45 @@ const filteredInvoices = useMemo(() => {
   };
 
   // Check loading states
-const isLoading = buyersLoading || unitsLoading || projectsLoading || invoicesLoading;
+  const isLoading = buyersLoading || unitsLoading || projectsLoading || invoicesLoading;
 
-// Check error states
-const hasError = buyersError || unitsError || projectsError || invoicesError;
-const errorMessage = buyersError || unitsError || projectsError || invoicesError;
+  // Check error states
+  const hasError = buyersError || unitsError || projectsError || invoicesError;
+  const errorMessage = buyersError || unitsError || projectsError || invoicesError;
 
-// Add loading state before the main return
-if (isLoading) {
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading invoices...</p>
+  // Add loading state before the main return
+  if (isLoading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading invoices...</p>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-// Add error state
-if (hasError) {
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
-          <p className="text-gray-600 mb-4">{errorMessage}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Reload Page
-          </button>
+  // Add error state
+  if (hasError) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
+            <p className="text-gray-600 mb-4">{errorMessage}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Reload Page
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
+    );
+  }
 
   return (
     <div className="p-6">
@@ -453,7 +405,6 @@ if (hasError) {
           </p>
         </div>
 
-        {/* <div className="bg-white rounded-lg shadow-sm border p-6"> */}
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -523,7 +474,7 @@ if (hasError) {
                 placeholder={isAdmin ? "Search invoices..." : "Search your invoices..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="text-gray-700 placeholder-gray-400 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -608,7 +559,7 @@ if (hasError) {
         <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center justify-between text-sm text-gray-600">
             <span>
-              Showing {filteredInvoices.length} of {isAdmin ? invoices.length : getFilteredInvoices().length} invoices
+              Showing {filteredInvoices.length} of {isAdmin ? invoices?.length || 0 : getFilteredInvoices().length} invoices
             </span>
             <div className="flex items-center space-x-4">
               <span>Paid: {summaryStats.paid}</span>
@@ -660,7 +611,7 @@ if (hasError) {
                     <ArrowUpDown className="w-4 h-4 ml-1" />
                   </div>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500                 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -673,6 +624,9 @@ if (hasError) {
                     invoice={invoice}
                     onView={handleViewInvoice}
                     isAdmin={isAdmin}
+                    buyers={buyers}
+                    units={units}
+                    projects={projects}
                   />
                 ))
               ) : (
@@ -711,18 +665,30 @@ if (hasError) {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Bulk Actions:</span>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+              <button 
+                className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
+              >
                 <Download className="w-4 h-4 mr-1" />
                 Export Selected
               </button>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+              <button 
+                className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
+              >
                 <FileText className="w-4 h-4 mr-1" />
                 Send Reminders
               </button>
             </div>
             
             <div className="flex items-center space-x-2">
-              <button className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+              <button 
+                className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
+              >
                 <Download className="w-4 h-4 mr-1" />
                 Export All
               </button>
@@ -736,7 +702,11 @@ if (hasError) {
         <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Export your invoice history:</span>
-            <button className="flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+            <button 
+              className="flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors opacity-50 cursor-not-allowed"
+              disabled
+              title="Coming Soon"
+            >
               <Download className="w-4 h-4 mr-2" />
               Download PDF
             </button>
@@ -750,7 +720,7 @@ if (hasError) {
           <h3 className="text-lg font-semibold text-blue-900 mb-4">Need Help with Your Invoices?</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex items-start space-x-3">
-                        <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
+              <Phone className="w-5 h-5 text-blue-600 mt-0.5" />
               <div>
                 <p className="font-medium text-blue-900">Call Support</p>
                 <p className="text-sm text-blue-700">1-800-SUPPORT</p>
@@ -772,11 +742,27 @@ if (hasError) {
             <h4 className="font-medium text-blue-900 mb-2">Common Questions:</h4>
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• <strong>Payment Methods:</strong> We accept credit cards, bank transfers, and checks</li>
-              <li>• <strong>Payment Plans:</strong> Contact us to discuss payment arrangement options</li>
+              <li>• <strong>Payment Plans:</strong> Contact us to discuss installment options</li>
               <li>• <strong>Late Fees:</strong> Applied 15 days after due date - call us to avoid fees</li>
               <li>• <strong>Receipts:</strong> Download receipts directly from each invoice</li>
             </ul>
           </div>
+
+          {summaryStats.pending > 0 && (
+            <div className="mt-4 pt-4 border-t border-blue-200">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-blue-900">
+                  Ready to pay your pending invoices?
+                </span>
+                <button
+                  onClick={() => setStatusFilter('pending')}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                >
+                  View Pending Invoices
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -818,16 +804,15 @@ export default function InvoicesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login');
     }
   }, [status, router]);
+
   if (status === 'unauthenticated') {
     return null; // prevent rendering until redirected
   }
-
   
   if (status === 'loading') {
     return (
@@ -836,6 +821,7 @@ export default function InvoicesPage() {
       </div>
     );
   }
+
   // Allow access for all authenticated users
   const canViewInvoices = session.user.role === ROLES.ADMIN || 
                          session.user.role === ROLES.MANAGER ||
@@ -861,3 +847,4 @@ export default function InvoicesPage() {
     </DashboardLayout>
   );
 }
+

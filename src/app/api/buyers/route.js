@@ -60,7 +60,6 @@ const mockBuyers = [
     updatedAt: "2023-12-20T09:15:00Z"
   }
 ];
-
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -73,36 +72,47 @@ export async function GET(request) {
       })
       
       if (response.ok) {
-        const buyers = await response.json()
+        const data = await response.json()
         return NextResponse.json({
           success: true,
-          data: buyers,
-          total: buyers.length,
-          source: 'backend'
+          data: data
         })
       }
     } catch (backendError) {
-      console.warn('Backend unavailable, using mock data:', backendError.message)
+      console.log('Backend unavailable, using mock data')
     }
 
     // Fallback to mock data
+    let filteredBuyers = [...mockBuyers]
+
+    // Apply filters if provided
+    if (params.search) {
+      const searchTerm = params.search.toLowerCase()
+      filteredBuyers = filteredBuyers.filter(buyer => 
+        buyer.firstName.toLowerCase().includes(searchTerm) ||
+        buyer.lastName.toLowerCase().includes(searchTerm) ||
+        buyer.email.toLowerCase().includes(searchTerm)
+      )
+    }
+
     return NextResponse.json({
       success: true,
-      data: mockBuyers,
-      total: mockBuyers.length,
-      source: 'mock'
+      data: filteredBuyers
     })
+
   } catch (error) {
+    console.error('Error fetching buyers:', error)
     return NextResponse.json(
-      {
-        success: false,
-        message: "Failed to fetch buyers",
-        error: error.message,
+      { 
+        success: false, 
+        error: 'Failed to fetch buyers',
+        message: error.message 
       },
       { status: 500 }
     )
   }
 }
+
 
 export async function POST(request) {
   try {

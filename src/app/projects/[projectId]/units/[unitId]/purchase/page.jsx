@@ -322,7 +322,7 @@ const handleSubmit = async () => {
         // Verify the invoice success status
 const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
   interval: 3000,    // every 3s
-  maxAttempts: 10,   // try for 30s total
+  maxAttempts: 15,   // try for 30s total
 });
         
         if (success) {
@@ -996,18 +996,18 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Unit Price:</span>
-                        <span className="font-medium">{formatPrice(unit.price)}</span>
+                        <span className="text-gray-800 font-medium">{formatPrice(unit.price)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Estimated Taxes & Fees (8%):</span>
-                        <span className="font-medium">{formatPrice(taxAmount)}</span>
+                        <span className="text-gray-800 font-medium">{formatPrice(taxAmount)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Processing Fee:</span>
-                        <span className="font-medium">{formatPrice(processingFee)}</span>
+                        <span className="text-gray-800 font-medium">{formatPrice(processingFee)}</span>
                       </div>
                       <div className="border-t pt-3 flex justify-between">
-                        <span className="font-medium text-gray-900">Total Purchase Price:</span>
+                        <span className="font-medium bold text-gray-900">Total Purchase Price:</span>
                         <span className="font-bold text-gray-900">{formatPrice(finalTotal)}</span>
                       </div>
                       
@@ -1040,7 +1040,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                         <>
                           <Smartphone className="w-5 h-5 text-green-600" />
                           <div>
-                            <div className="font-medium">M-Pesa Push</div>
+                            <div className="text-gray-900 font-medium">M-Pesa Push</div>
                             <div className="text-sm text-gray-600">
                               Payment to: {formData.mpesaNumber}
                             </div>
@@ -1213,19 +1213,19 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Bedrooms:</span>
-                    <div className="font-medium">{unit.bedrooms}</div>
+                    <div className="text-gray-600 font-medium">{unit.bedrooms}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Bathrooms:</span>
-                    <div className="font-medium">{unit.bathrooms}</div>
+                    <div className="text-gray-600 font-medium">{unit.bathrooms}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Square Feet:</span>
-                    <div className="font-medium">{unit.sqft?.toLocaleString()}</div>
+                    <div className="text-gray-600 font-medium">{unit.sqft?.toLocaleString()}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Floor:</span>
-                    <div className="font-medium">{unit.floor}</div>
+                    <div className="text-gray-600 font-medium">{unit.floor}</div>
                   </div>
                 </div>
 
@@ -1245,15 +1245,15 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
               <div className="space-y-3">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Base Price:</span>
-                  <span className="font-medium">{formatPrice(unit.price)}</span>
+                  <span className="text-gray-600 font-medium">{formatPrice(unit.price)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Est. Taxes (8%):</span>
-                  <span className="font-medium">{formatPrice(taxAmount)}</span>
+                  <span className="text-gray-600 font-medium">{formatPrice(taxAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Processing Fee:</span>
-                  <span className="font-medium">{formatPrice(processingFee)}</span>
+                  <span className="text-gray-600 font-medium">{formatPrice(processingFee)}</span>
                 </div>
 
                 <div className="border-t pt-3 flex justify-between">

@@ -47,11 +47,9 @@ export default function NewProjectPage() {
     name: '',
     description: '',
     coordinates: '',
-    // location: '',
     address: '',
     city: '',
     state: '',
-    // postalCode: '',
     developerName: '',
     status: 'PLANNING',
     startDate: '',
@@ -68,21 +66,11 @@ export default function NewProjectPage() {
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Project name is required';
-    }
-    if (!formData.description.trim()) {
-      newErrors.description = 'Description is required';
-    }
-    if (!formData.address.trim()) {
-      newErrors.address = 'Address is required';
-    }
-    if (!formData.city.trim()) {
-      newErrors.city = 'City is required';
-    }
-    if (!formData.state.trim()) {
-      newErrors.state = 'State is required';
-    }
+    if (!formData.name.trim()) newErrors.name = 'Project name is required';
+    if (!formData.description.trim()) newErrors.description = 'Description is required';
+    if (!formData.address.trim()) newErrors.address = 'Address is required';
+    if (!formData.city.trim()) newErrors.city = 'City is required';
+    if (!formData.state.trim()) newErrors.state = 'State is required';
     if (!formData.coordinates.trim()) {
       newErrors.coordinates = 'Coordinates are required';
     } else {
@@ -92,20 +80,9 @@ export default function NewProjectPage() {
       }
     }
 
-    // Remove the location validation lines
-
-    // if (!formData.postalCode.trim()) {
-    //   newErrors.postalCode = 'ZIP code is required';
-    // }
-    if (!formData.developerName.trim()) {
-      newErrors.developerName = 'Developer name is required';
-    }
-    if (!formData.status) {
-      newErrors.status = 'Status is required';
-    }
-    if (!formData.startDate) {
-      newErrors.startDate = 'Start date is required';
-    }
+    if (!formData.developerName.trim()) newErrors.developerName = 'Developer name is required';
+    if (!formData.status) newErrors.status = 'Status is required';
+    if (!formData.startDate) newErrors.startDate = 'Start date is required';
     if (formData.status !== 'planning' && !formData.targetCompletionDate) {
       newErrors.targetCompletionDate = 'Target completion date is required';
     }
@@ -124,7 +101,6 @@ export default function NewProjectPage() {
       [name]: value
     }));
 
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
@@ -156,33 +132,29 @@ export default function NewProjectPage() {
     try {
       setIsUploading(true);
 
-      // Upload images first if any are selected
       let imageFilenames = [];
       if (formData.images && formData.images.length > 0) {
         toast.info('Uploading images...');
         imageFilenames = await uploadImages(formData.images);
       }
 
-const projectData = {
-  name: formData.name,
-  description: formData.description,
-  address: formData.address,
-  subCounty: formData.city,
-  county: formData.state,
-  developerName: formData.developerName,
-  status: formData.status,
-  constructionProgress: parseInt(formData.constructionProgress) || 0,
-  downPaymentPercentage: parseFloat(formData.downPaymentPercentage) / 100,
-  amenities: formData.amenities ? formData.amenities.split(',').map(a => a.trim()) : [],
-  images: imageFilenames,
-  startDate: new Date(formData.startDate),
-  targetCompletionDate: formData.targetCompletionDate ? new Date(formData.targetCompletionDate) : null,
-  // Parse coordinates and send as separate fields
-  latitude: parseFloat(formData.coordinates.split(',')[0].trim()),
-  longitude: parseFloat(formData.coordinates.split(',')[1].trim()),
-  // Don't include the coordinates field in the payload
-};
-
+      const projectData = {
+        name: formData.name,
+        description: formData.description,
+        address: formData.address,
+        subCounty: formData.city,
+        county: formData.state,
+        developerName: formData.developerName,
+        status: formData.status,
+        constructionProgress: parseInt(formData.constructionProgress) || 0,
+        downPaymentPercentage: parseFloat(formData.downPaymentPercentage) / 100,
+        amenities: formData.amenities ? formData.amenities.split(',').map(a => a.trim()) : [],
+        images: imageFilenames,
+        startDate: new Date(formData.startDate),
+        targetCompletionDate: formData.targetCompletionDate ? new Date(formData.targetCompletionDate) : null,
+        latitude: parseFloat(formData.coordinates.split(',')[0].trim()),
+        longitude: parseFloat(formData.coordinates.split(',')[1].trim()),
+      };
 
       await createProject(projectData, {
         onSuccess: (data) => {
@@ -191,7 +163,6 @@ const projectData = {
         },
         onError: (error) => {
           console.error('Error creating project:', error);
-
           if (error.message?.includes('409') || error.message?.includes('Conflict')) {
             toast.error('Project name already exists. Please choose a different name.');
           } else {
@@ -208,6 +179,8 @@ const projectData = {
   };
 
   const isSubmitting = createLoading || isUploading;
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">

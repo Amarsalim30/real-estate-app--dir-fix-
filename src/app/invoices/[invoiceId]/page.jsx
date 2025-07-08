@@ -1,9 +1,11 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import StatusBadge from '@/components/ui/status-badge';
 import { InvoiceStatuses } from '@/data/invoices';
+import InvoicePreview  from '@/components/invoices/InvoicesPreview';
 
 import { useBuyers } from '@/hooks/useBuyers';
 import { useUnits } from '@/hooks/useUnits';
@@ -11,7 +13,8 @@ import { useProjects } from '@/hooks/useProjects';
 import { useInvoices } from '@/hooks/useInvoices';
 import { usePayments } from '@/hooks/usePayments';
 
-import { formatPrice } from '@/utils/format';
+import { formatPrice, formatDate } from '@/utils/format';
+import { isInvoiceOverdue, getInvoiceDisplayStatus, calculateInvoiceSubtotal } from '@/utils/invoice-helpers';
 import { ROLES } from '@/lib/roles';
 import Link from 'next/link';
 import { 
@@ -39,25 +42,6 @@ import {
   MapPin,
   Hash
 } from 'lucide-react';
-
-const StatusBadge = ({ status }) => {
-  const statusConfig = {
-    paid: { color: 'bg-green-100 text-green-800', icon: CheckCircle, label: 'Paid' },
-    pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock, label: 'Pending' },
-    overdue: { color: 'bg-red-100 text-red-800', icon: AlertCircle, label: 'Overdue' },
-    cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircle, label: 'Cancelled' }
-  };
-
-  const config = statusConfig[status] || statusConfig.pending;
-  const Icon = config.icon;
-
-  return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${config.color}`}>
-      <Icon className="w-4 h-4 mr-2" />
-      {config.label}
-    </span>
-  );
-};
 
 const InfoCard = ({ title, children, className = "" }) => (
   <div className={`bg-white rounded-lg shadow-sm border p-6 ${className}`}>
@@ -96,100 +80,96 @@ const CopyButton = ({ text, label }) => {
 
 function InvoiceDetailContent() {
   const { data: session } = useSession();
-  const { buyers: Buyers } = useBuyers();
-  const { units: Units } = useUnits();
-  const { projects: Projects } = useProjects();
-  const { invoices: Invoices } = useInvoices();
-  const { payments: Payments } = usePayments();
+  const { buyers } = useBuyers();
+  const { units } = useUnits();
+  const { projects } = useProjects();
+  const { invoices } = useInvoices();
+  const { payments } = usePayments();
 
   const params = useParams();
   const router = useRouter();
   
-  // Fix: Properly initialize invoiceId
-  const invoiceId = params.invoiceId ? parseInt(params.invoiceId) : null;
+  const invoiceId = parseInt(params.invoiceId);
 
-  const [invoice, setInvoice] = useState(null);
-  const [buyer, setBuyer] = useState(null);
-  const [unit, setUnit] = useState(null);
-  const [project, setProject] = useState(null);
-  const [relatedPayments, setRelatedPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
-  // Get user's buyer ID for access control
-  const getUserBuyerId = () => {
-    if (session?.user?.buyerId) {
-      return session.user.buyerId;
+  // Fixed: Calculate userBuyerId with proper dependencies
+  const userBuyerId = useMemo(() => {
+    if (!session?.user || !buyers) return null;
+    
+    if (session.user.buyerId) {
+      return Number(session.user.buyerId);
     }
     
-    const buyer = Buyers?.find(b => b.email === session?.user?.email);
+    const buyer = buyers.find(b => b.email === session.user.email);
     return buyer?.id || null;
-  };
+  }, [session, buyers]);
 
-  const userBuyerId = getUserBuyerId();
+  // Get invoice and related data
+  const { invoice, buyer, unit, project, relatedPayments } = useMemo(() => {
+    if (!invoices || !buyers || !units || !projects || !payments || !invoiceId || isNaN(invoiceId)) {
+      return { invoice: null, buyer: null, unit: null, project: null, relatedPayments: [] };
+    }
+
+    const foundInvoice = invoices.find(i => i.id === invoiceId);
+    if (!foundInvoice) {
+      return { invoice: null, buyer: null, unit: null, project: null, relatedPayments: [] };
+    }
+
+    // Check access permissions for non-admin users
+    if (!isAdmin && foundInvoice.buyerId != userBuyerId) {
+      return { invoice: null, buyer: null, unit: null, project: null, relatedPayments: [] };
+    }
+
+    // Fixed: Use loose comparison for buyer lookup
+    const foundBuyer = buyers.find(b => b.id == foundInvoice.buyerId);
+        const foundUnit = units.find(u => u.id === foundInvoice.unitId);
+    const foundProject = projects.find(p => p.id === foundUnit.projectId);
+    const foundpayments = payments?.filter(p => p.invoiceId === foundInvoice.id) || [];
+
+    return {
+      invoice: foundInvoice,
+      buyer: foundBuyer,
+      unit: foundUnit,
+      project: foundProject,
+      relatedPayments: foundpayments
+    };
+  }, [invoiceId, isAdmin, userBuyerId, invoices, buyers, units, projects, payments]);
 
   useEffect(() => {
-    const fetchInvoiceData = () => {
-      try {
-        setLoading(true);
-        setError(null);
+    // Set loading state based on data availability
+    if (!invoices || !buyers || !units || !projects || !payments) {
+      setLoading(true);
+      setError(null);
+      return;
+    }
 
-        // Fix: Check if invoiceId is valid first
-        if (!invoiceId || isNaN(invoiceId)) {
-          setError('Invalid invoice ID');
-          setLoading(false);
-          return;
-        }
+    if (!invoiceId || isNaN(invoiceId)) {
+      setError('Invalid invoice ID');
+      setLoading(false);
+      return;
+    }
 
-        // Only proceed if all necessary data is available
-        if (!Invoices || !Buyers || !Units || !Projects || !Payments) {
-          return; // Still waiting for data to load
-        }
+    if (!invoice) {
+      setError('Invoice not found');
+      setLoading(false);
+      return;
+    }
 
-        const foundInvoice = Invoices.find(i => i.id === invoiceId);
+    // Check access for non-admin users
+    if (!isAdmin && invoice.buyerId != userBuyerId) {
+      setError('Access denied');
+      setLoading(false);
+      return;
+    }
 
-        if (!foundInvoice) {
-          setError('Invoice not found');
-          setLoading(false);
-          return;
-        }
-
-        // Check access permissions for non-admin users
-        if (!isAdmin && foundInvoice.buyerId !== userBuyerId) {
-          setError('Access denied');
-          setLoading(false);
-          return;
-        }
-
-        setInvoice(foundInvoice);
-
-        // Get related data
-        const foundBuyer = Buyers.find(b => b.id === foundInvoice.buyerId);
-        setBuyer(foundBuyer);
-
-        const foundProject = Projects.find(p => p.id === foundInvoice.projectId);
-        setProject(foundProject);
-      
-        const foundUnit = Units.find(u => u.id === foundInvoice.unitId);
-        setUnit(foundUnit);
-
-        // Get related payments
-        const payments = Payments.filter(p => p.invoiceId === foundInvoice.id) || [];
-        setRelatedPayments(payments);
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching invoice data:', error);
-        setError('Failed to load invoice data');
-        setLoading(false);
-      }
-    };
-
-    fetchInvoiceData();
-  }, [invoiceId, isAdmin, userBuyerId, Invoices, Buyers, Units, Projects, Payments]);
-
+    setLoading(false);
+    setError(null);
+  }, [invoice, invoiceId, isAdmin, userBuyerId, invoices, buyers, units, projects, payments]);
+  
   const handleEdit = () => {
     router.push(`/invoices/${invoiceId}/edit`);
   };
@@ -198,7 +178,8 @@ function InvoiceDetailContent() {
     if (confirm('Are you sure you want to delete this invoice? This action cannot be undone.')) {
       // TODO: Implement actual delete functionality
       console.log('Delete invoice:', invoice);
-      router.push('/invoices');
+      alert('Delete functionality coming soon!');
+      // router.push('/invoices');
     }
   };
 
@@ -218,6 +199,7 @@ function InvoiceDetailContent() {
     if (confirm('Are you sure you want to mark this invoice as paid?')) {
       // TODO: Implement mark as paid functionality
       console.log('Mark as paid:', invoice);
+      alert('Mark as paid functionality coming soon!');
     }
   };
 
@@ -225,7 +207,7 @@ function InvoiceDetailContent() {
     if (confirm('Send payment reminder to customer?')) {
       // TODO: Implement send reminder functionality
       console.log('Send reminder for invoice:', invoice);
-      alert('Payment reminder sent successfully!');
+      alert('Send reminder functionality coming soon!');
     }
   };
 
@@ -267,9 +249,9 @@ function InvoiceDetailContent() {
     );
   }
 
-  const isOverdue = invoice.status === InvoiceStatuses.PENDING && 
-                   new Date(invoice.dueDate) < new Date();
-  const displayStatus = isOverdue ? 'overdue' : invoice.status;
+  const displayStatus = getInvoiceDisplayStatus(invoice);
+  const isOverdue = isInvoiceOverdue(invoice);
+  const subtotal = calculateInvoiceSubtotal(invoice);
 
   return (
     <div className="p-6">
@@ -286,22 +268,24 @@ function InvoiceDetailContent() {
             <h1 className="text-3xl font-bold text-gray-900">
               {isAdmin ? 'Invoice Details' : 'Your Invoice'}
             </h1>
-            <p className="text-gray-600">Invoice #{invoice.id}</p>
+            <p className="text-gray-600">Invoice #{invoice.invoiceNumber}</p>
           </div>
         </div>
-
         <div className="flex items-center space-x-3">
+
           <button
             onClick={handlePrint}
-            className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="text-blue-600 flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Printer className="w-4 h-4 mr-2" />
+            <Printer className=" text-blue-600 w-4 h-4 mr-2" />
             Print
           </button>
 
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className=" text-blue-700 flex items-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors opacity-50 cursor-not-allowed"
+            disabled
+            title="Coming Soon"
           >
             <Download className="w-4 h-4 mr-2" />
             Download PDF
@@ -320,7 +304,9 @@ function InvoiceDetailContent() {
           {isAdmin && (
             <button
               onClick={handleEdit}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors opacity-50 cursor-not-allowed"
+              disabled
+              title="Coming Soon"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit
@@ -337,7 +323,7 @@ function InvoiceDetailContent() {
             <div>
               <h3 className="text-sm font-semibold text-red-900">Invoice Overdue</h3>
               <p className="text-sm text-red-700 mt-1">
-                This invoice was due on {new Date(invoice.dueDate).toLocaleDateString()}. 
+                This invoice was due on {formatDate(invoice.dueDate)}. 
                 Please pay as soon as possible to avoid additional late fees.
               </p>
               <div className="mt-3 flex items-center space-x-4">
@@ -365,8 +351,8 @@ function InvoiceDetailContent() {
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Invoice Number</label>
                 <div className="flex items-center">
-                  <p className="text-lg font-semibold text-gray-900">#{invoice.id}</p>
-                  <CopyButton text={invoice.id.toString()} label="invoice number" />
+                  <p className="text-lg font-semibold text-gray-900">#{invoice.invoiceNumber}</p>
+                  <CopyButton text={invoice.invoiceNumber} label="invoice number" />
                 </div>
               </div>
 
@@ -379,11 +365,7 @@ function InvoiceDetailContent() {
                 <label className="block text-sm font-medium text-gray-600 mb-1">Issue Date</label>
                 <div className="flex items-center text-gray-900">
                   <Calendar className="w-4 h-4 mr-2" />
-                  {new Date(invoice.issuedDate).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {formatDate(invoice.issuedDate)}
                 </div>
               </div>
 
@@ -391,11 +373,7 @@ function InvoiceDetailContent() {
                 <label className="block text-sm font-medium text-gray-600 mb-1">Due Date</label>
                 <div className={`flex items-center ${isOverdue ? 'text-red-600' : 'text-gray-900'}`}>
                   <Calendar className="w-4 h-4 mr-2" />
-                  {new Date(invoice.dueDate).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
+                  {formatDate(invoice.dueDate)}
                   {isOverdue && <span className="ml-2 text-xs font-medium">(OVERDUE)</span>}
                 </div>
               </div>
@@ -405,18 +383,14 @@ function InvoiceDetailContent() {
                   <label className="block text-sm font-medium text-gray-600 mb-1">Paid Date</label>
                   <div className="flex items-center text-green-600">
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    {new Date(invoice.paidDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
+                    {formatDate(invoice.paidDate)}
                   </div>
                 </div>
               )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-600 mb-1">Payment Terms</label>
-                <p className="text-gray-900">{invoice.paymentTerms}</p>
+                <p className="text-gray-900">{invoice.paymentTerms || 'Net 30'}</p>
               </div>
             </div>
 
@@ -451,7 +425,8 @@ function InvoiceDetailContent() {
                   </div>
                 </button>
               )}
-                          {buyer && isAdmin && (
+
+              {buyer && isAdmin && (
                 <Link
                   href={`/buyers/${buyer.id}`}
                   className="flex items-center w-full px-4 py-3 text-left bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
@@ -479,7 +454,9 @@ function InvoiceDetailContent() {
 
               <button
                 onClick={handleDownloadPDF}
-                className="flex items-center w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                className="flex items-center w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
               >
                 <Download className="w-5 h-5 text-gray-600 mr-3" />
                 <div>
@@ -511,12 +488,12 @@ function InvoiceDetailContent() {
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Subtotal</span>
-              <span className="font-medium text-gray-900">{formatPrice(invoice.totalAmount)}</span>
+              <span className="font-medium text-gray-900">{formatPrice(subtotal)}</span>
             </div>
             
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Tax</span>
-              <span className="font-medium text-gray-900">{formatPrice(invoice.taxAmount)}</span>
+              <span className="font-medium text-gray-900">{formatPrice(invoice.taxAmount || 0)}</span>
             </div>
             
             <div className="border-t border-gray-200 pt-4">
@@ -531,7 +508,7 @@ function InvoiceDetailContent() {
                 <div className="flex items-center">
                   <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
                   <span className="text-sm font-medium text-green-900">
-                    Paid in full on {new Date(invoice.paidDate).toLocaleDateString()}
+                    Paid in full on {formatDate(invoice.paidDate)}
                   </span>
                 </div>
               </div>
@@ -663,7 +640,7 @@ function InvoiceDetailContent() {
       )}
 
       {/* Payment History */}
-      {relatedPayments.length > 0 && (
+      {relatedPayments.length > 0 ? (
         <InfoCard title="Payment History" className="mb-8">
           <div className="overflow-x-auto">
             <table className="min-w-full">
@@ -681,7 +658,7 @@ function InvoiceDetailContent() {
                 {relatedPayments.map((payment) => (
                   <tr key={payment.id} className="border-b border-gray-100">
                     <td className="py-3 text-sm text-gray-900">
-                      {new Date(payment.paymentDate).toLocaleDateString()}
+                      {formatDate(payment.paymentDate)}
                     </td>
                     <td className="py-3 text-sm font-medium text-gray-900">
                       {formatPrice(payment.amount)}
@@ -715,6 +692,10 @@ function InvoiceDetailContent() {
             </table>
           </div>
         </InfoCard>
+      ) : (
+        <InfoCard title="Payment History" className="mb-8">
+          <p className="text-gray-600 italic">No payments recorded for this invoice.</p>
+        </InfoCard>
       )}
 
       {/* Admin Actions - Admin Only */}
@@ -724,7 +705,9 @@ function InvoiceDetailContent() {
           <div className="flex items-center space-x-4">
             <button
               onClick={handleEdit}
-              className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors opacity-50 cursor-not-allowed"
+              disabled
+              title="Coming Soon"
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit Invoice
@@ -732,7 +715,9 @@ function InvoiceDetailContent() {
             
             <button
               onClick={handleDelete}
-              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors opacity-50 cursor-not-allowed"
+              disabled
+              title="Coming Soon"
             >
               <Trash2 className="w-4 h-4 mr-2" />
               Delete Invoice
@@ -740,8 +725,10 @@ function InvoiceDetailContent() {
             
             {invoice.status === InvoiceStatuses.PENDING && (
               <button
-                onClick={() => console.log('Mark as paid')}
-                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={handleMarkAsPaid}
+                className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Mark as Paid
@@ -750,8 +737,10 @@ function InvoiceDetailContent() {
 
             {invoice.status === InvoiceStatuses.PENDING && (
               <button
-                onClick={() => console.log('Send reminder')}
-                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                onClick={handleSendReminder}
+                className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Coming Soon"
               >
                 <Mail className="w-4 h-4 mr-2" />
                 Send Reminder
@@ -759,10 +748,11 @@ function InvoiceDetailContent() {
             )}
           </div>
           <p className="text-sm text-red-600 mt-2">
-            ⚠️ These actions are irreversible. Please use with caution.
+            ⚠️ These actions are coming soon. Please use with caution when implemented.
           </p>
         </div>
       )}
+
       {/* User Help Section - Non-Admin Only */}
       {!isAdmin && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
@@ -807,7 +797,7 @@ function InvoiceDetailContent() {
                   onClick={handlePayNow}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                 >
-                  Pay {formatPrice(invoice.totalAmount)} Now
+                                    Pay {formatPrice(invoice.totalAmount)} Now
                 </button>
               </div>
             </div>
@@ -869,4 +859,5 @@ export default function InvoiceDetailPage() {
     </DashboardLayout>
   );
 }
+
 

@@ -122,7 +122,7 @@ export const invoicesApi = {
 
   while (attempts < maxAttempts) {
     try {
-      const response = await api.get(`/invoices/${invoiceId}/has-success`);
+      const response = await api.get(`/payments/invoice/${invoiceId}/has-success`);
       if (response.data === true) {
         return true; // success
       }

@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   FileText
 } from 'lucide-react';
+import { apiBaseUrl } from 'next-auth/client/_utils';
 
 export default function ReservationSuccessPage() {
   const params = useParams();
@@ -23,6 +24,8 @@ export default function ReservationSuccessPage() {
   const { data: session } = useSession();
       const { projects, loading: isLoading, error } = useProjects();
   const { units } = useUnits();
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
   
 
   const unit = Array.isArray(units) ? units.find(u => u.id === parseInt(params.unitId)) : null;
@@ -80,23 +83,23 @@ export default function ReservationSuccessPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Unit:</span>
-                      <span className="font-medium">Unit {unit.unitNumber}</span>
+                      <span className="text-gray-700 font-medium">Unit {unit.unitNumber}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Project:</span>
-                      <span className="font-medium">{project.name}</span>
+                      <span className="text-gray-700 font-medium">{project.name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Location:</span>
-                      <span className="font-medium">{project.location}</span>
+                      <span className="text-gray-600">Reserved By:</span>
+                      <span className="text-gray-700 font-medium">{session?.user?.firstName}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Size:</span>
-                      <span className="font-medium">{unit.sqft?.toLocaleString()} sq ft</span>
+                      <span className="text-gray-700 font-medium">{unit.sqft?.toLocaleString()} sq ft</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Price:</span>
-                      <span className="font-medium">{formatPrice(unit.price)}</span>
+                      <span className="text-gray-700 font-medium">{formatPrice(unit.price)}</span>
                     </div>
                   </div>
                 </div>
@@ -106,19 +109,19 @@ export default function ReservationSuccessPage() {
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Reserved On:</span>
-                      <span className="font-medium">{reservationDate}</span>
+                      <span className="text-gray-700 font-medium">{reservationDate}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Expires On:</span>
-                      <span className="font-medium text-orange-600">{expirationDate}</span>
+                      <span className="text-gray-700 font-medium text-orange-600">{expirationDate}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Deposit Paid:</span>
-                      <span className="font-medium">{formatPrice(depositAmount)}</span>
+                      <span className="text-gray-700 font-medium">{formatPrice(depositAmount)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Reservation Fee:</span>
-                      <span className="font-medium">{formatPrice(reservationFee)}</span>
+                      <span className="text-gray-700 font-medium">{formatPrice(reservationFee)}</span>
                     </div>
                     <div className="border-t pt-3 flex justify-between">
                       <span className="font-semibold text-gray-900">Total Paid:</span>
@@ -339,7 +342,7 @@ export default function ReservationSuccessPage() {
               
               <div className="aspect-w-16 aspect-h-9 mb-4">
                 <img
-                  src={unit.images?.[0] || '/images/placeholder-unit.jpg'}
+                  src={`${apiBaseUrl}/images/${unit.images?.[0] }`|| '/images/placeholder-unit.jpg'}
                   alt={`Unit ${unit.unitNumber}`}
                   className="w-full h-32 object-cover rounded-lg"
                   onError={(e) => {
@@ -351,23 +354,23 @@ export default function ReservationSuccessPage() {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Unit:</span>
-                  <span className="font-medium">{unit.unitNumber}</span>
+                  <span className="text-gray-700 font-medium">{unit.unitNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Floor:</span>
-                  <span className="font-medium">{unit.floor}</span>
+                  <span className="text-gray-700 font-medium">{unit.floor}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Bedrooms:</span>
-                  <span className="font-medium">{unit.bedrooms}</span>
+                  <span className="text-gray-700 font-medium">{unit.bedrooms}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Bathrooms:</span>
-                  <span className="font-medium">{unit.bathrooms}</span>
+                  <span className="text-gray-700 font-medium">{unit.bathrooms}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Size:</span>
-                  <span className="font-medium">{unit.sqft?.toLocaleString()} sq ft</span>
+                  <span className="text-gray-700 font-medium">{unit.sqft?.toLocaleString()} sq ft</span>
                 </div>
               </div>
               

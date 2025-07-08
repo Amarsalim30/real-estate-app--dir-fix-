@@ -235,7 +235,7 @@ const stats = useMemo(() => {
     .reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
   const ownedUnits = safeUnits.filter(u => u.soldToId === userBuyerId).length;
-  const reservedUnits = safeUnits.filter(u => u.reservedById === userBuyerId).length;
+  const reservedUnits = safeUnits.filter(u => u.reservedBy == session.user.id).length;
 
   return {
     totalInvoices,
@@ -895,7 +895,7 @@ const recentActivity = useMemo(() => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Phone Number</label>
-                  <p className="text-gray-900">{buyer.phone}</p>
+                  <p className="text-gray-900">{buyer.phoneNumber}</p>
                 </div>
 
                 <div>

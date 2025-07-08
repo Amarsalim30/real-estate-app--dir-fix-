@@ -1,15 +1,17 @@
 const config = {
-  plugins: [require('tailwind-scrollbar-hide')]
-};
-module.exports = {
   content: [
     "./node_modules/flowbite-react/**/*.js",
-    "./pages/**/*.{js,jsx}",
-    "./components/**/*.{js,jsx}",
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  theme: { extend: {} },
-  plugins: [require('flowbite/plugin')],
-}
-
+  theme: { 
+    extend: {} 
+  },
+  plugins: [
+    require('flowbite/plugin'),
+    require('tailwind-scrollbar-hide')
+  ],
+};
 
 export default config;

@@ -1,10 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState ,useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProjects';
 import { useUnits } from '@/hooks/useUnits';
 import { useSession } from 'next-auth/react';
 import { formatPrice } from '@/utils/format';
+import { useBuyers} from '@/hooks/useBuyers';
 import { 
   ArrowLeft, 
   Calendar, 
@@ -20,20 +21,42 @@ import {
 export default function UnitReservePage() {
   const params = useParams();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session ,status } = useSession();
     const { projects, loading: isLoading, error } = useProjects();
   const { units } = useUnits();
-  
-  const [formData, setFormData] = useState({
-    firstName: session?.user?.name?.split(' ')[0] || '',
-    lastName: session?.user?.name?.split(' ')[1] || '',
-    email: session?.user?.email || '',
-    phone: '',
-    reservationPeriod: '30', // days
-    depositAmount: '',
-    paymentMethod: 'wire_transfer',
-    agreeToTerms: false,
-  });
+  const { buyers } = useBuyers();
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+const [buyer, setBuyer] = useState(null);
+
+useEffect(() => {
+  if (session?.user?.buyerId && Array.isArray(buyers)) {
+    const found = buyers.find(b => b.id === session.user.buyerId);
+    setBuyer(found);
+  }
+}, [buyers, session?.user?.buyerId]);
+
+useEffect(() => {
+  if (buyer?.phoneNumber) {
+    setFormData(prev => ({
+      ...prev,
+      phoneNumber: buyer.phoneNumber
+    }));
+  }
+}, [buyer]);
+
+
+const [formData, setFormData] = useState({
+  firstName: session?.user?.firstName || '',
+  lastName: session?.user?.lastName || '',
+  email: session?.user?.email || '',
+  phoneNumber: buyer?.phoneNumber || '',
+  reservationPeriod: '30',
+  depositAmount: '',
+  agreeToTerms: false,
+  paymentMethod: 'wire_transfer',
+});
+
   
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -66,7 +89,7 @@ export default function UnitReservePage() {
   }
 
   // Check if unit is available for reservation
-  if (unit.status !== 'available') {
+  if (unit.status !== 'AVAILABLE') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -102,7 +125,7 @@ export default function UnitReservePage() {
     if (!formData.firstName) newErrors.firstName = 'First name is required';
     if (!formData.lastName) newErrors.lastName = 'Last name is required';
     if (!formData.email) newErrors.email = 'Email is required';
-    if (!formData.phone) newErrors.phone = 'Phone number is required';
+    if (!formData.phoneNumber) newErrors.phoneNumber = 'Phone number is required';
     if (!formData.depositAmount) newErrors.depositAmount = 'Deposit amount is required';
     if (!formData.agreeToTerms) newErrors.agreeToTerms = 'You must agree to the terms';
     
@@ -116,30 +139,45 @@ export default function UnitReservePage() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  if (!validateForm()) return;
+  
+  setIsSubmitting(true);
+  
+  try {
+    // Simulate API call delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) return;
-    
-    setIsSubmitting(true);
-    
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // In a real app, you would submit to your API
-      console.log('Reservation submitted:', { unit, project, formData });
-      
-      // Redirect to success page
-      router.push(`/projects/${project.id}/units/${unit.id}/reserve/success`);
-    } catch (error) {
-      console.error('Reservation submission failed:', error);
-      setErrors({ submit: 'Failed to submit reservation. Please try again.' });
-    } finally {
-      setIsSubmitting(false);
+    const response = await fetch(`${apiBaseUrl}/units/${unit.id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        status: 'RESERVED',
+        reservedBy: session?.user?.id,
+        reservedDate: new Date().toISOString(),
+reservedUntil: new Date(Date.now() + Number(formData.reservationPeriod) * 24 * 60 * 60 * 1000).toISOString()
+      }),
+    });
+
+    const responseJson = await response.json();
+    if (!response.ok) {
+      throw new Error(responseJson.message || 'Failed to reserve unit');
     }
-  };
+
+    console.log('Reservation submitted:', { unit, project, formData });
+    
+    router.push(`/projects/${project.id}/units/${unit.id}/reserve/reserveSuccess`);
+  } catch (error) {
+    console.error('Reservation submission failed:', error);
+    setErrors({ submit: 'Failed to submit reservation. Please try again.' });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const depositAmount = parseFloat(formData.depositAmount) || 0;
   const minDeposit = unit.price * 0.05;
@@ -189,7 +227,7 @@ export default function UnitReservePage() {
                         name="firstName"
                         value={formData.firstName}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`placeholder-gray-500 text-gray-500 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.firstName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your first name"
@@ -208,7 +246,7 @@ export default function UnitReservePage() {
                         name="lastName"
                         value={formData.lastName}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`placeholder-gray-500 text-gray-500 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.lastName ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your last name"
@@ -229,7 +267,7 @@ export default function UnitReservePage() {
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        className={`placeholder-gray-500 text-gray-500 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                           errors.email ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="Enter your email"
@@ -245,16 +283,16 @@ export default function UnitReservePage() {
                       </label>
                       <input
                         type="tel"
-                        name="phone"
-                        value={formData.phone}
+                        name="phoneNumber"
+                        value={formData.phoneNumber}
                         onChange={handleInputChange}
-                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                          errors.phone ? 'border-red-500' : 'border-gray-300'
+                        className={`placeholder-gray-500 text-gray-500 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                          errors.phoneNumber ? 'border-red-500' : 'border-gray-300'
                         }`}
                         placeholder="(555) 123-4567"
                       />
-                      {errors.phone && (
-                        <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                      {errors.phoneNumber && (
+                        <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>
                       )}
                     </div>
                   </div>
@@ -265,14 +303,14 @@ export default function UnitReservePage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Reservation Terms</h3>
                   
                   <div>
-                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Reservation Period
                     </label>
                     <select
                       name="reservationPeriod"
                       value={formData.reservationPeriod}
                       onChange={handleInputChange}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="placeholder-gray-500 text-gray-500 w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="15">15 days</option>
                       <option value="30">30 days (Recommended)</option>
@@ -295,7 +333,7 @@ export default function UnitReservePage() {
                       onChange={handleInputChange}
                       min={minDeposit}
                       max={maxDeposit}
-                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      className={`placeholder-gray-500 text-gray-500 w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.depositAmount ? 'border-red-500' : 'border-gray-300'
                       }`}
                       placeholder={minDeposit.toString()}
@@ -322,12 +360,12 @@ export default function UnitReservePage() {
                         value="wire_transfer"
                         checked={formData.paymentMethod === 'wire_transfer'}
                         onChange={handleInputChange}
-                        className="mr-3"
+                        className="placeholder-gray-500 text-gray-500 mr-3"
                       />
                       <div className="flex items-center">
                         <Building className="w-5 h-5 mr-2 text-blue-600" />
                         <div>
-                          <div className="font-medium">Wire Transfer</div>
+                          <div className="placeholder-gray-500 text-gray-500 font-medium">Wire Transfer</div>
                           <div className="text-sm text-gray-500">Instant processing</div>
                         </div>
                       </div>
@@ -345,7 +383,7 @@ export default function UnitReservePage() {
                       <div className="flex items-center">
                         <CheckCircle className="w-5 h-5 mr-2 text-green-600" />
                         <div>
-                          <div className="font-medium">Certified Check</div>
+                          <div className="placeholder-gray-500 text-gray-500 font-medium">Certified Check</div>
                           <div className="text-sm text-gray-500">2-3 business days</div>
                         </div>
                       </div>
@@ -406,7 +444,7 @@ export default function UnitReservePage() {
                 <div className="flex justify-between pt-6 border-t">
                   <button
                     type="button"
-                    onClick={() => router.push(`/projects/${project.id}/units/${unit.id}`)}
+                    onClick={() =>  router.push(`/projects/${project.id}/units/${unit.id}`)}
                     className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Cancel
@@ -437,12 +475,13 @@ export default function UnitReservePage() {
           {/* Sidebar */}
           <div className="space-y-6">
             {/* Unit Summary */}
-            <div className="bg-white rounded-xl shadow-sm border p-6 sticky top-8">
+            <div className="bg-white rounded-xl shadow-sm border p-6  top-8">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Reservation Summary</h3>
               
               <div className="aspect-w-16 aspect-h-9 mb-4">
                 <img
-                  src={unit.images?.[0] || '/images/placeholder-unit.jpg'}
+                src={unit.images?.[0] ? `${apiBaseUrl}/images/${unit.images[0]}` : '/images/placeholder-unit.jpg'}
+
                   alt={`Unit ${unit.unitNumber}`}
                   className="w-full h-32 object-cover rounded-lg"
                   onError={(e) => {
@@ -460,19 +499,19 @@ export default function UnitReservePage() {
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Bedrooms:</span>
-                    <div className="font-medium">{unit.bedrooms}</div>
+                    <div className="text-gray-700 font-medium">{unit.bedrooms}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Bathrooms:</span>
-                    <div className="font-medium">{unit.bathrooms}</div>
+                    <div className="text-gray-700 font-medium">{unit.bathrooms}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Square Feet:</span>
-                    <div className="font-medium">{unit.sqft?.toLocaleString()}</div>
+                    <div className="text-gray-700 font-medium">{unit.sqft?.toLocaleString()}</div>
                   </div>
                   <div>
                     <span className="text-gray-600">Floor:</span>
-                    <div className="font-medium">{unit.floor}</div>
+                    <div className="text-gray-700 font-medium">{unit.floor}</div>
                   </div>
                 </div>
                 
@@ -498,7 +537,7 @@ export default function UnitReservePage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Reservation Fee:</span>
-                  <span className="font-medium">{formatPrice(reservationFee)}</span>
+                  <span className="text-gray-700 font-medium">{formatPrice(reservationFee)}</span>
                 </div>
                 <div className="border-t pt-3 flex justify-between">
                   <span className="font-semibold text-gray-900">Total Due Today:</span>

@@ -52,6 +52,7 @@ export const authOptions = {
             username: user.username || user.email.split("@")[0],
             email: user.email,
             role: user.role,
+            buyerId: user.buyerId,
           };
         } catch (error) {
           console.error("Auth error:", error);
@@ -73,6 +74,7 @@ export const authOptions = {
         session.user.email = token.email;
         session.user.firstName = token.firstName;
         session.user.lastName = token.lastName;
+        session.user.buyerId = token.buyerId; // Ensure buyerId is included if needed
 
       }
       return session;
@@ -85,6 +87,7 @@ export const authOptions = {
         token.email = user.email;
         token.firstName = user.firstName;
         token.lastName = user.lastName;
+        token.buyerId = user.buyerId; 
       }
       return token;
     },

@@ -1,18 +1,17 @@
 'use client';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import DashboardLayout from '@/components/layout/dashboard-layout';
-
 import { PaymentMethods, PaymentStatuses } from '@/data/payments';
-
-import { usePayments } from '@/hooks/usePayments';
-import { useInvoices, useInvoice } from '@/hooks/useInvoices';
-import { useBuyers } from '@/hooks/useBuyers';
-import { useUnits } from '@/hooks/useUnits';
-import { useProjects } from '@/hooks/useProjects';
+import { paymentsApi } from '@/lib/api/payments';
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
+import {useBuyers} from '@/hooks/useBuyers';
+import { useInvoices} from '@/hooks/useInvoices';
+import { useUnits } from '@/hooks/useUnits';
+
 import { 
   CreditCard,
   Search,
@@ -25,14 +24,15 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  X,
   ChevronDown,
   ArrowUpDown,
   User,
   Building,
   RefreshCw,
   TrendingUp,
-  FileText
+  FileText,
+  Menu,
+  X
 } from 'lucide-react';
 
 const StatusBadge = ({ status, size = 'normal' }) => {
@@ -105,116 +105,152 @@ const PaymentMethodIcon = ({ method }) => {
   }
 };
 
-const PaymentRow = ({ payment, onView, isAdmin, invoices, units, buyers, projects }) => {
-  // Early return if data not ready
-  if (!invoices || !units || !buyers || !projects) {
-    return (
-      <tr>
-        <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-4 text-center">
-          <div className="animate-pulse">Loading payment data...</div>
-        </td>
-      </tr>
-    );
-  }
-
-  // Find related data
-  const invoice = invoices.find(i => i.id === payment.invoiceId);
-  const unit = units.find(u => u.id === payment.unitId);
-  const buyer = buyers.find(b => b.id === payment.buyerId);
-  const project = invoice ? projects.find(p => p.id === invoice.projectId) : null;
-
-  return (
-    <tr className="hover:bg-gray-50 border-b border-gray-200">
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="flex items-center">
-          <CreditCard className="w-5 h-5 text-gray-400 mr-3" />
-          <div>
-            <div className="text-sm font-medium text-gray-900">
-              {payment.transactionId}
-            </div>
-            <div className="text-sm text-gray-500">
-              {new Date(payment.paymentDate).toLocaleDateString()}
-            </div>
-          </div>
-        </div>
-      </td>
-      
-      {isAdmin && (
-        <td className="px-6 py-4 whitespace-nowrap">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-              <User className="w-4 h-4 text-blue-600" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-900">
-                {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
-              </div>
-              <div className="text-sm text-gray-500">
-                {buyer?.email || 'N/A'}
-              </div>
-            </div>
-          </div>
-        </td>
-      )}
-      
-      <td className="px-6 py-4 whitespace-nowrap">
-        <div className="text-sm font-medium text-gray-900">
+// Mobile-optimized Payment Card Component
+const PaymentCard = ({ payment, onView, isAdmin ,buyer,invoice ,units}) => (
+  <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center space-x-2">
+        <PaymentMethodIcon method={payment.paymentMethod} />
+        <span className="text-sm font-medium text-gray-900">
+          {payment.transactionId}
+        </span>
+      </div>
+      <StatusBadge status={payment.status} />
+    </div>
+    
+    <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-600">Amount</span>
+        <span className="text-lg font-semibold text-gray-900">
           {formatPrice(payment.amount)}
-        </div>
-        <div className="flex items-center mt-1">
-          <PaymentMethodIcon method={payment.paymentMethod} />
-          <span className="ml-2 text-sm text-gray-500 capitalize">
-            {payment?.paymentMethod?.replace('_', ' ') || '—'}
+        </span>
+      </div>
+      
+      {isAdmin && payment.buyer && (
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Customer</span>
+          <span className="text-sm text-gray-900">
+            {buyer.firstName} {buyer.lastName}
           </span>
         </div>
-      </td>
+      )}
       
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-600">Date</span>
+        <span className="text-sm text-gray-900">
+          {new Date(payment.paymentDate).toLocaleDateString()}
+        </span>
+      </div>
+      
+      {payment.project && (
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">Property</span>
+          <span className="text-sm text-gray-900 truncate max-w-32">
+            {units.find(unit => unit.id === invoice.unitId)?.projectName}
+          </span>
+        </div>
+      )}
+    </div>
+    
+    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+      <button
+        onClick={() => onView(payment)}
+        className="flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+      >
+        <Eye className="w-4 h-4 mr-1" />
+        View
+      </button>
+      <button className="flex items-center px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded transition-colors">
+        <Download className="w-4 h-4 mr-1" />
+        Receipt
+      </button>
+    </div>
+  </div>
+);
+
+// Desktop Payment Row Component
+const PaymentRow = ({ payment, onView, isAdmin ,buyer ,invoice ,units }) => (
+  <tr className="hover:bg-gray-50 border-b border-gray-200">
+    <td className="px-6 py-4 whitespace-nowrap">
+      <div className="flex items-center">
+        <PaymentMethodIcon method={payment.paymentMethod} />
+        <div className="ml-3">
+          <div className="text-sm font-medium text-gray-900">
+            {payment.transactionId}
+          </div>
+          <div className="text-sm text-gray-500">
+            {new Date(payment.paymentDate).toLocaleDateString()}
+          </div>
+        </div>
+      </div>
+    </td>
+    
+    {isAdmin && (
       <td className="px-6 py-4 whitespace-nowrap">
         <div className="flex items-center">
-          <Building className="w-4 h-4 text-gray-400 mr-2" />
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+            <User className="w-4 h-4 text-blue-600" />
+          </div>
           <div>
-            <div className="text-sm text-gray-900">
-              {project?.name || 'Unknown Project'}
+            <div className="text-sm font-medium text-gray-900">
+              {buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown Buyer'}
             </div>
             <div className="text-sm text-gray-500">
-              Unit {unit?.unitNumber || 'N/A'}
+              {buyer?.email || 'N/A'}
             </div>
           </div>
         </div>
       </td>
-      
-      <td className="px-6 py-4 whitespace-nowrap">
-        <StatusBadge status={payment.status} />
-      </td>
-      
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-        <div className="flex items-center justify-end space-x-2">
-          <button
-            onClick={() => onView(payment)}
-            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-            title="View Payment"
-          >
-            <Eye className="w-4 h-4" />
-          </button>
-          <button
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-            title="Download Receipt"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+    )}
+    
+    <td className="px-6 py-4 whitespace-nowrap">
+      <div className="text-sm font-medium text-gray-900">
+        {formatPrice(payment.amount)}
+      </div>
+      <div className="text-sm text-gray-500 capitalize">
+        {payment.paymentMethod?.replace('_', ' ') || '—'}
+      </div>
+    </td>
+    
+    <td className="px-6 py-4 whitespace-nowrap">
+      <div className="flex items-center">
+        <Building className="w-4 h-4 text-gray-400 mr-2" />
+        <div>
+          <div className="text-sm text-gray-900">
+            {units.find(u => u.id === invoice.unitId)?.projectName|| 'Unknown Project'}
+          </div>
+          <div className="text-sm text-gray-500">
+            Unit {units.find(u => u.id === invoice.unitId)?.unitNumber || 'N/A'}
+          </div>
         </div>
-      </td>
-    </tr>
-  );
-};
+      </div>
+    </td>
+    
+    <td className="px-6 py-4 whitespace-nowrap">
+      <StatusBadge status={payment.status} />
+    </td>
+    
+    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+      <div className="flex items-center justify-end space-x-2">
+        <button
+          onClick={() => onView(payment)}
+          className="text-blue-600 hover:text-blue-900 p-1 rounded"
+          title="View Payment"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+        <button
+          className="text-gray-400 hover:text-gray-600 p-1 rounded"
+          title="Download Receipt"
+        >
+          <Download className="w-4 h-4" />
+        </button>
+      </div>
+    </td>
+  </tr>
+);
 
 function PaymentsContent() {
-  const { buyers, loading: buyersLoading } = useBuyers();
-  const { projects, loading: projectsLoading } = useProjects();
-  const { units, loading: unitsLoading } = useUnits();
-  const { invoices, loading: invoicesLoading } = useInvoices();
-  const { payments, loading: paymentsLoading } = usePayments();
-  
   const { data: session } = useSession();
   const router = useRouter();
   
@@ -225,172 +261,99 @@ function PaymentsContent() {
   const [sortBy, setSortBy] = useState('paymentDate');
   const [sortOrder, setSortOrder] = useState('desc');
   const [showFilters, setShowFilters] = useState(false);
-  const [errors, setErrors] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [isMobile, setIsMobile] = useState(false);
+
+  const {buyers}=useBuyers();
+  const {invoices}=useInvoices();
+  const {units}=useUnits();
+
+
 
   const isAdmin = session?.user?.role === ROLES.ADMIN;
 
-  // Get user's buyer ID - this could be from session or mapped from email/user ID
-  const getUserBuyerId = () => {
-    if (session?.user?.buyerId) {
-      return session.user.buyerId;
-    }
-    
-    // Fallback: find buyer by email if buyerId not in session
-    if (buyers && Array.isArray(buyers)) {
-      const buyer = buyers.find(b => b.email === session?.user?.email);
-      return buyer?.id || null;
-    }
-    
-    return null;
-  };
-    const userBuyerId = getUserBuyerId();
-
-
-  // Filter payments based on user role
-  const getFilteredPayments = () => {
-    if (!payments || !Array.isArray(payments)) {
-      return [];
-    }
-    
-    if (isAdmin) {
-      return payments; // Admin sees all payments
-    } else {
-      // Non-admin users see only their own payments
-      if (!userBuyerId) {
-        return []; // No payments if user not linked to a buyer
-      }
-      return payments.filter(payment => payment.buyerId === userBuyerId);
-    }
-  };
-
-    // Filter and sort payments
-  const filteredPayments = useMemo(() => {
-      let filtered = getFilteredPayments();
-
-    if (!Array.isArray(filtered)) {
-      filtered = [];
-    }
-    // Filter by search term
-    if (searchTerm && filtered.length > 0) {
-      filtered = filtered.filter(payment => {
-        const buyer = buyers?.find(b => b.id === payment.buyerId);
-        const unit = units?.find(u => u.id === payment.unitId);
-        const invoice = invoices?.find(i => i.id === payment.invoiceId);
-        const project = projects?.find(p => p.id === invoice?.projectId);
-        
-        return (
-          payment.transactionId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (buyer && `${buyer.firstName} ${buyer.lastName}`.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (project && project.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (unit && unit.unitNumber?.toLowerCase().includes(searchTerm.toLowerCase()))
-        );
-      });
-    }
-
-    // Filter by status
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(payment => payment.status === statusFilter);
-    }
-
-    // Filter by payment method
-    if (methodFilter !== 'all') {
-      filtered = filtered.filter(payment => payment.paymentMethod === methodFilter);
-    }
-
-    // Filter by date range
-    if (dateRange !== 'all') {
-      const now = new Date();
-      const filterDate = new Date();
-      
-      switch (dateRange) {
-        case '7days':
-          filterDate.setDate(now.getDate() - 7);
-          break;
-        case '30days':
-          filterDate.setDate(now.getDate() - 30);
-          break;
-        case '90days':
-          filterDate.setDate(now.getDate() - 90);
-          break;
-        case '1year':
-          filterDate.setFullYear(now.getFullYear() - 1);
-          break;
-      }
-      
-      filtered = filtered.filter(payment => 
-        new Date(payment.paymentDate) >= filterDate
-      );
-    }
-
-    if (Array.isArray(filtered)) {
-      // Sort payments
-      filtered.sort((a, b) => {
-        let aValue, bValue;
-        
-        switch (sortBy) {
-          case 'transactionId':
-            aValue = a.transactionId;
-            bValue = b.transactionId;
-            break;
-          case 'amount':
-            aValue = a.amount;
-            bValue = b.amount;
-            break;
-          case 'status':
-            aValue = a.status;
-            bValue = b.status;
-            break;
-          case 'paymentMethod':
-            aValue = a.paymentMethod;
-            bValue = b.paymentMethod;
-            break;
-          default:
-            aValue = new Date(a.paymentDate);
-            bValue = new Date(b.paymentDate);
-        }
-        
-        if (sortOrder === 'asc') {
-          return aValue > bValue ? 1 : -1;
-        } else {
-          return aValue < bValue ? 1 : -1;
-        }
-      });
-    }
-
-    return filtered;
-  }, [payments, buyers, units, invoices, projects, searchTerm, statusFilter, methodFilter, dateRange, sortBy, sortOrder, isAdmin, userBuyerId]);
-
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const total = filteredPayments.length;
-    const completed = filteredPayments.filter(p => p.status === PaymentStatuses.COMPLETED).length;
-    const pending = filteredPayments.filter(p => p.status === PaymentStatuses.PENDING).length;
-    const failed = filteredPayments.filter(p => p.status === PaymentStatuses.FAILED).length;
-    const refunded = filteredPayments.filter(p => p.status === PaymentStatuses.REFUNDED).length;
-    
-    const totalAmount = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
-    const completedAmount = filteredPayments
-      .filter(p => p.status === PaymentStatuses.COMPLETED)
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    const pendingAmount = filteredPayments
-      .filter(p => p.status === PaymentStatuses.PENDING)
-      .reduce((sum, payment) => sum + payment.amount, 0);
-    const refundedAmount = filteredPayments
-      .filter(p => p.status === PaymentStatuses.REFUNDED)
-      .reduce((sum, payment) => sum + payment.amount, 0);
-
-    return {
-      total,
-      completed,
-      pending,
-      failed,
-      refunded,
-      totalAmount,
-      completedAmount,
-      pendingAmount,
-      refundedAmount
+  // Check for mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
     };
-  }, [filteredPayments]);
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Build query parameters
+  const queryParams = {
+    page: currentPage,
+    limit: pageSize,
+    search: searchTerm,
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    paymentMethod: methodFilter !== 'all' ? methodFilter : undefined,
+    dateRange: dateRange !== 'all' ? dateRange : undefined,
+    sortBy,
+    sortOrder,
+    include: 'buyer,invoice,unit,project' // Include related data
+  };
+
+  // Fetch payments data directly from API
+  const {
+    data: paymentsData,
+    isLoading,
+    error,
+    refetch
+  } = useQuery({
+    queryKey: ['payments', queryParams],
+    queryFn: () => {
+      if (isAdmin) {
+        return paymentsApi.getAll(queryParams);
+      } else {
+        // For non-admin users, fetch only their payments
+        const buyerId = session?.user?.buyerId;
+        if (!buyerId) {
+          throw new Error('User not linked to buyer account');
+        }
+        return paymentsApi.getByBuyer(buyerId, queryParams);
+      }
+    },
+    enabled: !!session,
+    keepPreviousData: true,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fetch payment statistics
+  const {
+    data: statsData,
+    isLoading: statsLoading
+  } = useQuery({
+    queryKey: ['payment-stats', { 
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      dateRange: dateRange !== 'all' ? dateRange : undefined
+    }],
+    queryFn: () => paymentsApi.getStats({
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      dateRange: dateRange !== 'all' ? dateRange : undefined,
+      buyerId: !isAdmin ? session?.user?.buyerId : undefined
+    }),
+    enabled: !!session,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+  const payments = paymentsData || [];
+  const totalCount = paymentsData?.total || 0;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  
+  const stats = statsData || {
+    total: 0,
+    completed: 0,
+    pending: 0,
+    failed: 0,
+    refunded: 0,
+    totalAmount: 0,
+    completedAmount: 0,
+    pendingAmount: 0,
+    refundedAmount: 0
+  };
 
   const handleSort = (field) => {
     if (sortBy === field) {
@@ -399,32 +362,66 @@ function PaymentsContent() {
       setSortBy(field);
       setSortOrder('desc');
     }
+    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const handleViewPayment = (payment) => {
     router.push(`/payments/${payment.id}`);
   };
 
-  const handleExportPDF = () => {
-    alert("Export PDF feature coming soon!");
-  };
-
-  const handleBulkExport = () => {
-    alert("Bulk export feature coming soon!");
-  };
-
-  const handleRetryFailed = () => {
-    if (confirm('Retry all failed payments?')) {
-      alert("Retry failed payments feature coming soon!");
+  const handleExport = async () => {
+    try {
+      const blob = await paymentsApi.export(queryParams);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `payments-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Export failed. Please try again.');
     }
   };
-  
-  // Show loading state
-  const isLoading = paymentsLoading || buyersLoading || unitsLoading || invoicesLoading || projectsLoading;
 
-  if (isLoading) {
+  const handleRetryFailed = async () => {
+    if (confirm('Retry all failed payments?')) {
+      try {
+        // This would need to be implemented in the API
+        alert("Retry functionality will be implemented soon!");
+      } catch (error) {
+        console.error('Retry failed:', error);
+        alert('Retry failed. Please try again.');
+      }
+    }
+  };
+
+  // Handle filter changes
+  const handleFilterChange = useCallback((filterType, value) => {
+    setCurrentPage(1); // Reset to first page when filtering
+    
+    switch (filterType) {
+      case 'search':
+        setSearchTerm(value);
+        break;
+      case 'status':
+        setStatusFilter(value);
+        break;
+      case 'method':
+        setMethodFilter(value);
+        break;
+      case 'dateRange':
+        setDateRange(value);
+        break;
+    }
+  }, []);
+
+  // Loading state
+  if (isLoading && !paymentsData) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           <span className="ml-3 text-gray-600">Loading payments...</span>
@@ -433,10 +430,30 @@ function PaymentsContent() {
     );
   }
 
-  // Show message if user has no payments
-  if (!isAdmin && !userBuyerId) {
+  // Error state
+  if (error) {
     return (
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
+        <div className="text-center py-12">
+          <AlertTriangle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Payments</h3>
+          <p className="text-gray-600 mb-4">{error.message}</p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No access state
+  if (!isAdmin && !session?.user?.buyerId) {
+    return (
+      <div className="p-4 sm:p-6">
         <div className="text-center py-12">
           <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Payment Access</h3>
@@ -449,14 +466,14 @@ function PaymentsContent() {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 sm:mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
             {isAdmin ? 'Payments' : 'Your Payments'}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-600 text-sm sm:text-base">
             {isAdmin 
               ? 'Track and manage all payment transactions'
               : 'View your payment history and transaction details'
@@ -467,7 +484,7 @@ function PaymentsContent() {
         {isAdmin && (
           <button
             onClick={() => router.push('/payments/new')}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto"
           >
             <Plus className="w-4 h-4 mr-2" />
             Record Payment
@@ -476,64 +493,64 @@ function PaymentsContent() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Payments</p>
-              <p className="text-2xl font-bold text-gray-900">{summaryStats.total}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Total</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
-            <CreditCard className="w-8 h-8 text-blue-600" />
+            <CreditCard className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            {formatPrice(summaryStats.totalAmount)} total value
+          <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
+            {formatPrice(stats.totalAmount)}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Completed</p>
-              <p className="text-2xl font-bold text-green-600">{summaryStats.completed}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Completed</p>
+              <p className="text-lg sm:text-2xl font-bold text-green-600">{stats.completed}</p>
             </div>
-            <CheckCircle className="w-8 h-8 text-green-600" />
+            <CheckCircle className="w-6 h-6 sm:w-8 sm:h-8 text-green-600" />
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            {formatPrice(summaryStats.completedAmount)} processed
+          <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
+            {formatPrice(stats.completedAmount)}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{summaryStats.pending}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Pending</p>
+              <p className="text-lg sm:text-2xl font-bold text-yellow-600">{stats.pending}</p>
             </div>
-            <Clock className="w-8 h-8 text-yellow-600" />
+            <Clock className="w-6 h-6 sm:w-8 sm:h-8 text-yellow-600" />
           </div>
-          <p className="text-sm text-gray-600 mt-2">
-            {formatPrice(summaryStats.pendingAmount)} processing
+          <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-2">
+            {formatPrice(stats.pendingAmount)}
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="bg-white rounded-lg shadow-sm border p-3 sm:p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Failed</p>
-              <p className="text-2xl font-bold text-red-600">{summaryStats.failed}</p>
+              <p className="text-xs sm:text-sm font-medium text-gray-600">Failed</p>
+              <p className="text-lg sm:text-2xl font-bold text-red-600">{stats.failed}</p>
             </div>
-            <AlertTriangle className="w-8 h-8 text-red-600" />
+            <AlertTriangle className="w-6 h-6 sm:w-8 sm:h-8 text-red-600" />
           </div>
-          <p className="text-sm text-red-600 mt-2">
-            {summaryStats.failed > 0 ? 'Requires attention' : 'All good'}
+          <p className="text-xs sm:text-sm text-red-600 mt-1 sm:mt-2">
+            {stats.failed > 0 ? 'Needs attention' : 'All good'}
           </p>
         </div>
       </div>
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg shadow-sm border mb-6">
-        <div className="p-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* Search */}
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -541,7 +558,7 @@ function PaymentsContent() {
                 type="text"
                 placeholder={isAdmin ? "Search payments..." : "Search your payments..."}
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -549,7 +566,7 @@ function PaymentsContent() {
             {/* Filter Toggle */}
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-center px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <Filter className="w-4 h-4 mr-2" />
               Filters
@@ -560,14 +577,14 @@ function PaymentsContent() {
           {/* Advanced Filters */}
           {showFilters && (
             <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Status
                   </label>
                   <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => handleFilterChange('status', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Status</option>
@@ -584,7 +601,7 @@ function PaymentsContent() {
                   </label>
                   <select
                     value={methodFilter}
-                    onChange={(e) => setMethodFilter(e.target.value)}
+                    onChange={(e) => handleFilterChange('method', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Methods</option>
@@ -604,7 +621,7 @@ function PaymentsContent() {
                   </label>
                   <select
                     value={dateRange}
-                    onChange={(e) => setDateRange(e.target.value)}
+                    onChange={(e) => handleFilterChange('dateRange', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Time</option>
@@ -625,6 +642,7 @@ function PaymentsContent() {
                       const [field, order] = e.target.value.split('-');
                       setSortBy(field);
                       setSortOrder(order);
+                      setCurrentPage(1);
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
@@ -643,232 +661,231 @@ function PaymentsContent() {
         </div>
 
         {/* Results Summary */}
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
-          <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="px-4 sm:px-6 py-3 bg-gray-50 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm text-gray-600">
             <span>
-              Showing {filteredPayments.length} of {getFilteredPayments().length} payments
+              Showing {payments.length} of {totalCount} payments
             </span>
             <div className="flex items-center space-x-4">
-              <span>Completed: {summaryStats.completed}</span>
-              <span>Pending: {summaryStats.pending}</span>
-              <span>Failed: {summaryStats.failed}</span>
+              <span>Completed: {stats.completed}</span>
+              <span>Pending: {stats.pending}</span>
+              <span>Failed: {stats.failed}</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Payments Table */}
-      <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('transactionId')}
+      {/* Payments List - Mobile Cards / Desktop Table */}
+      {isMobile ? (
+        // Mobile Card View
+        <div className="space-y-4">
+          {payments.length > 0 ? (
+            payments.map((payment) => (
+              <PaymentCard
+                key={payment.id}
+                payment={payment}
+                onView={handleViewPayment}
+                isAdmin={isAdmin}
+                buyer={buyers.find(b => b.id === payment.buyerId)}
+                invoice={invoices.find(i => i.id === payment.invoiceId)}
+                units={units}
+              />
+            ))
+          ) : (
+            <div className="bg-white rounded-lg border p-8 text-center">
+              <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                {isAdmin ? 'No Payments Found' : 'No Payments Yet'}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm || statusFilter !== 'all' || methodFilter !== 'all' || dateRange !== 'all'
+                  ? `No payments match your current filters.`
+                  : isAdmin 
+                    ? 'Payment transactions will appear here once recorded.'
+                    : 'Your payment transactions will appear here once you make payments.'
+                }
+              </p>
+              {(!searchTerm && statusFilter === 'all' && methodFilter === 'all' && dateRange === 'all' && isAdmin) && (
+                <button
+                  onClick={() => router.push('/payments/new')}
+                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                 >
-                  <div className="flex items-center">
-                    Transaction
-                    <ArrowUpDown className="w-4 h-4 ml-1" />
-                  </div>
-                </th>
-                {isAdmin && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Customer
-                  </th>
-                )}
-                <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('amount')}
-                >
-                  <div className="flex items-center">
-                    Amount & Method
-                    <ArrowUpDown className="w-4 h-4 ml-1" />
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Property
-                </th>
-                <th 
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
-                  onClick={() => handleSort('status')}
-                >
-                  <div className="flex items-center">
-                    Status
-                    <ArrowUpDown className="w-4 h-4 ml-1" />
-                  </div>
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredPayments.length > 0 ? (
-                filteredPayments.map((payment) => (
-                  <PaymentRow
-                    key={payment.id}
-                    payment={payment}
-                    onView={handleViewPayment}
-                    isAdmin={isAdmin}
-                    buyers={buyers}
-                    projects={projects}
-                    units={units}
-                    invoices={invoices}
-                  />
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-12 text-center">
-                    <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      {isAdmin ? 'No Payments Found' : 'No Payments Yet'}
-                    </h3>
-                    <p className="text-gray-600 mb-6">
-                      {searchTerm || statusFilter !== 'all' || methodFilter !== 'all' || dateRange !== 'all'
-                        ? `No payments match your current filters.`
-                        : isAdmin 
-                          ? 'Payment transactions will appear here once recorded.'
-                          : 'Your payment transactions will appear here once you make payments.'
-                      }
-                    </p>
-                    {(!searchTerm && statusFilter === 'all' && methodFilter === 'all' && dateRange === 'all' && isAdmin) && (
-                      <button
-                        onClick={() => router.push('/payments/new')}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Record New Payment
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Record New Payment
+                </button>
               )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      </div>
+      ) : (
+        // Desktop Table View
+        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('transactionId')}
+                  >
+                    <div className="flex items-center">
+                      Transaction
+                      <ArrowUpDown className="w-4 h-4 ml-1" />
+                    </div>
+                  </th>
+                  {isAdmin && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Customer
+                    </th>
+                  )}
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('amount')}
+                  >
+                    <div className="flex items-center">
+                      Amount & Method
+                      <ArrowUpDown className="w-4 h-4 ml-1" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Property
+                  </th>
+                  <th 
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center">
+                      Status
+                      <ArrowUpDown className="w-4 h-4 ml-1" />
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {payments.length > 0 ? (
+                  payments.map((payment) => (
+                    <PaymentRow
+                      key={payment.id}
+                      payment={payment}
+                      onView={handleViewPayment}
+                      isAdmin={isAdmin}
+                      buyer={buyers.find(b => b.id === payment.buyerId)}
+                      invoice={invoices.find(i => i.id === payment.invoiceId)}
+                      units={units}
+                    />
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={isAdmin ? "6" : "5"} className="px-6 py-12 text-center">
+                      <CreditCard className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        {isAdmin ? 'No Payments Found' : 'No Payments Yet'}
+                      </h3>
+                      <p className="text-gray-600 mb-6">
+                        {searchTerm || statusFilter !== 'all' || methodFilter !== 'all' || dateRange !== 'all'
+                          ? `No payments match your current filters.`
+                          : isAdmin 
+                            ? 'Payment transactions will appear here once recorded.'
+                            : 'Your payment transactions will appear here once you make payments.'
+                        }
+                      </p>
+                      {(!searchTerm && statusFilter === 'all' && methodFilter === 'all' && dateRange === 'all' && isAdmin) && (
+                        <button
+                          onClick={() => router.push('/payments/new')}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <Plus className="w-4 h-4 mr-2" />
+                          Record New Payment
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
-      {/* Payment Method Distribution - Only show if there are payments */}
-      {filteredPayments.length > 0 && (
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Payment Methods Chart */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Methods</h3>
-            <div className="space-y-4">
-              {Object.values(PaymentMethods).map(method => {
-                const methodPayments = filteredPayments.filter(p => p.paymentMethod === method);
-                const methodAmount = methodPayments.reduce((sum, p) => sum + p.amount, 0);
-                const percentage = summaryStats.totalAmount > 0 ? (methodAmount / summaryStats.totalAmount) * 100 : 0;
-                
-                if (methodPayments.length === 0) return null;
-                
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} ({totalCount} total payments)
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            
+            {/* Page numbers */}
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = Math.max(1, Math.min(currentPage - 2 + i, totalPages - 4 + i));
                 return (
-                  <div key={method} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <PaymentMethodIcon method={method} />
-                      <span className="text-sm font-medium text-gray-700 capitalize">
-                        {method?.replace('_', ' ')|| '—'}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="w-32 bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <div className="text-right min-w-0">
-                        <div className="text-sm font-semibold text-gray-900">
-                          {formatPrice(methodAmount)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {methodPayments.length} payments
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1 text-sm border rounded ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
                 );
               })}
             </div>
-          </div>
-
-          {/* Recent Activity */}
-          <div className="bg-white rounded-lg shadow-sm border p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
-            <div className="space-y-4">
-              {filteredPayments
-                .sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
-                .slice(0, 5)
-                .map(payment => {
-                  const buyer = buyers.find(b => b.id === payment.buyerId);
-                  return (
-                    <div key={payment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                          <PaymentMethodIcon method={payment.paymentMethod} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {isAdmin 
-                              ? (buyer ? `${buyer.firstName} ${buyer.lastName}` : 'Unknown')
-                              : `Payment ${payment.transactionId.slice(-6)}`
-                            }
-                          </p>
-                          <p className="text-xs text-gray-600">
-                            {new Date(payment.paymentDate).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {formatPrice(payment.amount)}
-                        </p>
-                        <StatusBadge status={payment.status} />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bulk Actions - Admin Only */}
-      {isAdmin && filteredPayments.length > 0 && (
-        <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Bulk Actions:</span>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                <Download className="w-4 h-4 mr-1" />
-                Export Selected
-              </button>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
-                <RefreshCw className="w-4 h-4 mr-1" />
-                Retry Failed
-              </button>
-            </div>
             
-            <div className="flex items-center space-x-2">
-              <button className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-                <Download className="w-4 h-4 mr-1" />
-                Export All
-              </button>
-            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
           </div>
         </div>
       )}
 
-      {/* User-specific Export - Non-Admin Only */}
-      {!isAdmin && filteredPayments.length > 0 && (
-        <div className="mt-6 bg-white rounded-lg shadow-sm border p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Export your payment history:</span>
-            <button className="flex items-center px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </button>
+      {/* Action Buttons */}
+      <div className="mt-6 flex flex-col sm:flex-row gap-4">
+        {/* Export Button */}
+        <button
+          onClick={handleExport}
+          disabled={payments.length === 0}
+          className="flex items-center justify-center px-4 py-2 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <Download className="w-4 h-4 mr-2" />
+          Export {isAdmin ? 'All' : 'Your'} Payments
+        </button>
+
+        {/* Admin Actions */}
+        {isAdmin && stats.failed > 0 && (
+          <button
+            onClick={handleRetryFailed}
+            className="flex items-center justify-center px-4 py-2 text-sm bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Retry Failed Payments
+          </button>
+        )}
+      </div>
+
+      {/* Loading overlay for subsequent requests */}
+      {isLoading && paymentsData && (
+        <div className="fixed inset-0 bg-black bg-opacity-25 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="text-gray-700">Updating payments...</span>
           </div>
         </div>
       )}
@@ -885,11 +902,11 @@ export default function PaymentsPage() {
       router.push('/login');
     }
   }, [status, router]);
+
   if (status === 'unauthenticated') {
-    return null; // prevent rendering until redirected
+    return null;
   }
 
-  
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -904,4 +921,3 @@ export default function PaymentsPage() {
     </DashboardLayout>
   );
 }
-

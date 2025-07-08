@@ -45,6 +45,8 @@ const FilterSection = ({ title, children, isOpen, onToggle }) => (
 );
 
 const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
   const router = useRouter();
 
   const getStatusColor = (status) => {
@@ -93,8 +95,13 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       >
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-6">
+            <img
+                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                  alt={`Unit ${unit.unitNumber}`}
+                  className="w-full h-32 object-cover" />
             <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center relative">
-              <Building className="w-8 h-8 text-gray-400" />
+              {unit.images.length < 1 && <Building className="w-8 h-8 text-gray-400" />}
+          
               {unit.isFeatured && (
                 <div className="absolute -top-1 -right-1">
                   <Award className="w-4 h-4 text-yellow-500" />
@@ -165,7 +172,12 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
       onClick={handleUnitClick}
     >
       <div className="relative h-48 bg-gray-100 flex items-center justify-center">
-        <Building className="w-16 h-16 text-gray-400" />
+            <img
+                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                  alt={`Unit ${unit.unitNumber}`}
+                  className="w-full h-32 object-cover" />
+       {unit.images.length < 1 && (
+ <Building className="w-16 h-16 text-gray-400" />)}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
             {unit.status?.replace('_', ' ')}
@@ -1000,7 +1012,7 @@ export default function UnitsPage() {
                       <label key={stage} className="flex items-center">
                         <input
                           type="radio"
-                                                    name="constructionStage"
+                          name="constructionStage"
                           value={stage}
                           checked={filters.constructionStage === stage}
                           onChange={(e) => handleFilterChange('constructionStage', e.target.value)}

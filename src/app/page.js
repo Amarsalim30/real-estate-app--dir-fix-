@@ -78,7 +78,7 @@ export default function HomePage() {
           </h1>
           
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto leading-relaxed">
-            With over two decades of excellence in real estate, we've helped thousands of clients 
+            With over two decades of excellence in real estate, we&apos;ve helped thousands of clients 
             find their perfect properties and maximize their investments across premium markets.
           </p>
           
@@ -120,7 +120,7 @@ export default function HomePage() {
               <p className="text-gray-600 mb-6 leading-relaxed">
                 Founded in 2003, Estate began with a simple vision: to revolutionize the real estate 
                 experience through technology, transparency, and unmatched service. What started as a 
-                small firm has grown into one of the region's most trusted real estate companies.
+                small firm has grown into one of the region&apos;s most trusted real estate companies.
               </p>
               <p className="text-gray-600 mb-8 leading-relaxed">
                 Today, we manage over $2 billion in assets, have facilitated thousands of successful 

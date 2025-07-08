@@ -1,4 +1,4 @@
-import api from '../api';
+import  api  from '@/lib/api';
 
 export const paymentsApi = {
   // Get all payments
@@ -11,10 +11,10 @@ export const paymentsApi = {
     }
   },
 
-  // Get payment by ID
+  // Get payment by ID with all related data
   getById: async (id) => {
     try {
-      const response = await api.get(`/payments/${id}`);
+      const response = await api.get(`/payments/${id}?include=buyer,unit,project,invoice`);
       return response.data;
     } catch (error) {
       throw new Error(error.response?.data?.message || 'Failed to fetch payment');
@@ -51,16 +51,6 @@ export const paymentsApi = {
     }
   },
 
-  // Process payment
-  process: async (paymentData) => {
-    try {
-      const response = await api.post('/payments/process', paymentData);
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to process payment');
-    }
-  },
-
   // Refund payment
   refund: async (id, refundData) => {
     try {
@@ -71,23 +61,38 @@ export const paymentsApi = {
     }
   },
 
-  // Get payment history for a buyer
-  getByBuyer: async (buyerId, params = {}) => {
+  // Retry failed payment
+  retry: async (id) => {
     try {
-      const response = await api.get(`/payments/buyer/${buyerId}`, { params });
+      const response = await api.post(`/payments/${id}/retry`);
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch buyer payments');
+      throw new Error(error.response?.data?.message || 'Failed to retry payment');
     }
   },
 
-  // Get payment history for an invoice
-  getByInvoice: async (invoiceId, params = {}) => {
+  // Get payment receipt
+  getReceipt: async (id) => {
     try {
-      const response = await api.get(`/payments/invoice/${invoiceId}`, { params });
+      const response = await api.get(`/payments/${id}/receipt`, {
+        responseType: 'blob'
+      });
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to fetch invoice payments');
+      throw new Error(error.response?.data?.message || 'Failed to get receipt');
+    }
+  },
+
+  // Export payments
+  export: async (params = {}) => {
+    try {
+      const response = await api.get('/payments/export', {
+        params,
+        responseType: 'blob'
+      });
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to export payments');
     }
   },
 
@@ -100,26 +105,12 @@ export const paymentsApi = {
       throw new Error(error.response?.data?.message || 'Failed to fetch payment statistics');
     }
   },
-
-  // Verify payment status
-  verifyStatus: async (id) => {
+  getByBuyer: async (buyerId) => {
     try {
-      const response = await api.get(`/payments/${id}/verify`);
+      const response = await api.get(`/payments/buyer/${buyerId}/history`);
       return response.data;
     } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to verify payment status');
-    }
-  },
-
-  // Get payment receipt
-  getReceipt: async (id) => {
-    try {
-      const response = await api.get(`/payments/${id}/receipt`, {
-        responseType: 'blob'
-      });
-      return response.data;
-    } catch (error) {
-      throw new Error(error.response?.data?.message || 'Failed to generate payment receipt');
+      throw new Error(error.response?.data?.message || 'Failed to fetch payments for buyer');
     }
   }
 };
