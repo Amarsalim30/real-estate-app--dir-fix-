@@ -9,6 +9,8 @@ import { usePaymentPlans } from '@/hooks/usePaymentsPlan';
 import { PaymentPlanCard } from '@/components/ui/expandableCard';
 import api from '@/lib/api';
 import { invoicesApi } from '@/lib/api/invoices';
+import GenerateAgreementButton from '@/components/payments/GenerateAgreementButton';
+
 
 import {
   ArrowLeft,
@@ -40,6 +42,7 @@ export default function UnitPurchasePage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [buyerExists, setBuyerExists] = useState(false);
   const [createdBuyerId, setCreatedBuyerId] = useState(null);
+  const [buyer ,setBuyer] =useState(null);
   
   const [formData, setFormData] = useState({
     // Buyer Information
@@ -87,6 +90,7 @@ export default function UnitPurchasePage() {
           if (response.data) {
             const buyer = response.data;
             setBuyerExists(true);
+            setBuyer(buyer);
             setCreatedBuyerId(buyer.id);
 
             setCurrentStep(2); // Skip to payment plan selection
@@ -131,11 +135,14 @@ export default function UnitPurchasePage() {
   // Calculate financial amounts
   const taxAmount = unit?.price ? unit.price * 0.08 : 0;
   const totalAmount = unit?.price ? unit.price + taxAmount : 0;
-  
-  const selectedPlan = useMemo(() => {
-    if (!formData.paymentPlanId || !paymentPlansData) return null;
-    return paymentPlansData.find(p => p.id === formData.paymentPlanId);
-  }, [formData.paymentPlanId, paymentPlansData]);
+
+  console.log("paymentPlanId",formData.paymentPlanId)
+const selectedPlan = useMemo(() => {
+  if (!formData.paymentPlanId || !paymentPlansData) return null;
+  return paymentPlansData.find(p => p.id === Number(formData.paymentPlanId));
+}, [formData.paymentPlanId, paymentPlansData]);
+
+  console.log('Selected plan:', selectedPlan);
 
 const downPaymentAmount = useMemo(() => {
   if (!selectedPlan || !totalAmount) return totalAmount * 0.1; // Default 10%
@@ -145,6 +152,21 @@ const downPaymentAmount = useMemo(() => {
   const financingAmount = totalAmount - downPaymentAmount;
   const processingFee = selectedPlan?.details?.processingFee || 500;
   const finalTotal = totalAmount + processingFee;
+
+const financialSummary = {
+  basePrice: unit?.price || 0,
+  taxAmount: taxAmount ?? 0,
+  processingFee: processingFee ?? 0,
+  totalAmount: finalTotal ?? 0,
+  downPaymentAmount: downPaymentAmount ?? 0,
+  financingAmount: financingAmount ?? 0,
+  monthlyPayment:
+    financingAmount && selectedPlan?.durationMonths
+      ? financingAmount / selectedPlan.durationMonths
+      : 0,
+};
+console.log(selectedPlan);
+
 
   if (isLoading) {
     return (
@@ -270,6 +292,7 @@ catch (error) {
     setIsCreatingBuyer(false);
   }
 };
+
 
 const handleNext = async () => {
   if (currentStep === 1 && !buyerExists) {
@@ -1083,54 +1106,79 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                     </div>
                   </div>
 
-                  {/* Legal Agreements */}
-                  <div className="space-y-4 mb-6">
-                    <div className="flex items-start">
-                      <input
-                        type="checkbox"
-                        name="agreeToTerms"
-                        checked={formData.agreeToTerms}
-                        onChange={handleInputChange}
-                        className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <div>
-                        <label className="text-sm text-gray-700">
-                          I agree to the{' '}
-                          <button type="button" className="text-blue-600 hover:underline font-medium">
-                            Terms and Conditions
-                          </button>{' '}
-                          and{' '}
-                          <button type="button" className="text-blue-600 hover:underline font-medium">
-                            Purchase Agreement
-                          </button>
-                        </label>
-                        {errors.agreeToTerms && (
-                          <p className="mt-1 text-sm text-red-600">{errors.agreeToTerms}</p>
-                        )}
-                      </div>
-                    </div>
 
-                    <div className="flex items-start">
-                      <input
-                        type="checkbox"
-                        name="agreeToDisclosure"
-                        checked={formData.agreeToDisclosure}
-                        onChange={handleInputChange}
-                        className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                      />
-                      <div>
-                        <label className="text-sm text-gray-700">
-                          I acknowledge that I have received and reviewed the{' '}
-                          <button type="button" className="text-blue-600 hover:underline font-medium">
-                            Property Disclosure Statement
-                          </button>
-                        </label>
-                        {errors.agreeToDisclosure && (
-                          <p className="mt-1 text-sm text-red-600">{errors.agreeToDisclosure}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+{/* Legal Agreements */}
+<div className="space-y-4 mb-6">
+  <div className="flex items-start">
+    <input
+      type="checkbox"
+      name="agreeToTerms"
+      checked={formData.agreeToTerms}
+      onChange={handleInputChange}
+      className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+    />
+    <div>
+      <label className="text-sm text-gray-700">
+        I agree to the{' '}
+        <button type="button" className="text-blue-600 hover:underline font-medium">
+          Terms and Conditions
+        </button>{' '}
+        and{' '}
+        <GenerateAgreementButton 
+          buyer={{
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            nationalId: formData.nationalId,
+            kraPin: formData.kraPin,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.postalCode
+          }}
+          unit={unit}
+          project={project}
+          selectedPlan={selectedPlan}
+          financialSummary={{
+            basePrice: unit.price,
+            taxAmount: taxAmount,
+            processingFee: processingFee,
+            totalAmount: finalTotal,
+            downPaymentAmount: downPaymentAmount,
+            financingAmount: financingAmount,
+            monthlyPayment: financingAmount / (selectedPlan?.durationMonths || 1)
+          }}
+className="text-blue-600 hover:underline font-medium bg-transparent p-0 hover:bg-transparent border-none"        />
+      </label>
+      {errors.agreeToTerms && (
+        <p className="mt-1 text-sm text-red-600">{errors.agreeToTerms}</p>
+      )}
+    </div>
+  </div>
+
+  <div className="flex items-start">
+    <input
+      type="checkbox"
+      name="agreeToDisclosure"
+      checked={formData.agreeToDisclosure}
+      onChange={handleInputChange}
+      className="mt-1 mr-3 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+    />
+    <div>
+      <label className="text-sm text-gray-700">
+        I acknowledge that I have received and reviewed the{' '}
+        <button type="button" className="text-blue-600 hover:underline font-medium">
+          Property Disclosure Statement
+        </button>
+      </label>
+      {errors.agreeToDisclosure && (
+        <p className="mt-1 text-sm text-red-600">{errors.agreeToDisclosure}</p>
+      )}
+    </div>
+  </div>
+</div>
+
+
 
                   {errors.submit && (
                     <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
