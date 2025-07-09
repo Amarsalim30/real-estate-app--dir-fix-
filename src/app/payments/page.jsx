@@ -208,7 +208,7 @@ const PaymentRow = ({ payment, onView, isAdmin ,buyer ,invoice ,units }) => (
         {formatPrice(payment.amount)}
       </div>
       <div className="text-sm text-gray-500 capitalize">
-        {payment.paymentMethod?.replace('_', ' ') || '—'}
+        {payment.paymentMethod?.replace('_', ' ') || ''}
       </div>
     </td>
     

@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
+import { useState } from 'react';
+import React from 'react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { 
   Calendar, 
   Phone, 
@@ -40,7 +41,7 @@ export default function BookVisitModal({ isOpen, onClose, onBooking, projectName
     }
 
     // Phone validation for Kenyan format
-    if (!/^2547\d{8}$/.test(phone)) {
+    if (!/^2547\d{9}$/.test(phone)) {
       setError('Please enter a valid M-Pesa phone number (format: 2547XXXXXXXX)')
       return
     }
@@ -57,6 +58,10 @@ export default function BookVisitModal({ isOpen, onClose, onBooking, projectName
       }, 3000)
     } catch (e) {
       setError(e.message || 'Failed to book visit. Please try again.')
+            // Auto close after success
+      setTimeout(() => {
+        handleClose()
+      }, 3000)
     } finally {
       setLoading(false)
     }
@@ -73,10 +78,20 @@ export default function BookVisitModal({ isOpen, onClose, onBooking, projectName
 
   const handlePhoneChange = (e) => {
     const value = e.target.value.replace(/\D/g, '') // Remove non-digits
-    if (value.length <= 12) {
+    if (value.length <= 13) {
       setPhone(value)
     }
   }
+  const CustomLockedInput = React.forwardRef(({ value, onClick }, ref) => (
+  <div
+    onClick={onClick}
+    ref={ref}
+    className="text-gray-500 w-full px-3 sm:px-4 py-3 sm:py-4 border border-gray-300 rounded-lg cursor-pointer select-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-all text-sm sm:text-base"
+    tabIndex={0}
+  >
+    {value || 'Select date and time'}
+  </div>
+));
 
   // Get minimum date (tomorrow)
   const minDate = new Date()
@@ -215,23 +230,22 @@ export default function BookVisitModal({ isOpen, onClose, onBooking, projectName
                   </div>
                   
                   <div className="relative">
-                    <DatePicker
-                      selected={datetime}
-                      onChange={(date) => setDatetime(date)}
-                      showTimeSelect
-                      timeIntervals={30}
-                      minDate={minDate}
-                      maxDate={maxDate}
-                      filterTime={(time) => {
-                        const hour = time.getHours()
-                        return hour >= 8 && hour <= 18 // Only allow 8 AM to 6 PM
-                      }}
-                      dateFormat="EEEE, MMMM d, yyyy 'at' h:mm aa"
-                      className="w-full px-3 sm:px-4 py-3 sm:py-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-all text-sm sm:text-base"
-                      placeholderText="Select date and time"
-                      autoComplete="off"
-                      popperClassName="booking-datepicker-popper"
-                    />
+   <DatePicker
+  selected={datetime}
+  onChange={(date) => setDatetime(date)}
+  showTimeSelect
+  timeIntervals={30}
+  minDate={minDate}
+  maxDate={maxDate}
+  filterTime={(time) => {
+    const hour = time.getHours();
+    return hour >= 8 && hour <= 18;
+  }}
+  dateFormat="EEEE, MMMM d, yyyy 'at' h:mm aa"
+  autoComplete="off"
+  popperClassName="booking-datepicker-popper"
+  customInput={<CustomLockedInput />}
+/>
                   </div>
                   
                   <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 sm:p-4">
@@ -271,12 +285,12 @@ export default function BookVisitModal({ isOpen, onClose, onBooking, projectName
                       placeholder="2547XXXXXXXX"
                       value={phone}
                       onChange={handlePhoneChange}
-                      className="w-full pl-8 sm:pl-10 pr-12 sm:pr-16 py-3 sm:py-4 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-all"
-                      maxLength={12}
+                      className="text-gray-500 placeholder-gray-500 w-full pl-8 sm:pl-10 pr-12 sm:pr-16 py-3 sm:py-4 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-500 focus:border-slate-500 transition-all"
+                      maxLength={13}
                     />
                     <div className="absolute inset-y-0 right-0 pr-3 sm:pr-4 flex items-center pointer-events-none">
                       <span className="text-xs sm:text-sm text-gray-400">
-                        {phone.length}/12
+                        {phone.length}/13
                       </span>
                     </div>
                   </div>

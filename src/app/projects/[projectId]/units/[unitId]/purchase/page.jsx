@@ -12,6 +12,7 @@ import { invoicesApi } from '@/lib/api/invoices';
 import GenerateAgreementButton from '@/components/payments/GenerateAgreementButton';
 
 
+
 import {
   ArrowLeft,
   CreditCard,
@@ -43,6 +44,10 @@ export default function UnitPurchasePage() {
   const [buyerExists, setBuyerExists] = useState(false);
   const [createdBuyerId, setCreatedBuyerId] = useState(null);
   const [buyer ,setBuyer] =useState(null);
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+const [isDisabled, setIsDisabled] = useState(false);
+
+
   
   const [formData, setFormData] = useState({
     // Buyer Information
@@ -347,6 +352,8 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
   interval: 3000,    // every 3s
   maxAttempts: 15,   // try for 30s total
 });
+    setIsDisabled(false);
+
         
         if (success) {
           // Redirect to success page with invoice ID
@@ -1120,10 +1127,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
     <div>
       <label className="text-sm text-gray-700">
         I agree to the{' '}
-        <button type="button" className="text-blue-600 hover:underline font-medium">
-          Terms and Conditions
-        </button>{' '}
-        and{' '}
+       
         <GenerateAgreementButton 
           buyer={{
             firstName: formData.firstName,
@@ -1148,7 +1152,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
             financingAmount: financingAmount,
             monthlyPayment: financingAmount / (selectedPlan?.durationMonths || 1)
           }}
-className="text-blue-600 hover:underline font-medium bg-transparent p-0 hover:bg-transparent border-none"        />
+className="text-blue-600 hover:underline font-medium  p-0 hover:bg-blend-lighten border-none"        />
       </label>
       {errors.agreeToTerms && (
         <p className="mt-1 text-sm text-red-600">{errors.agreeToTerms}</p>
@@ -1171,6 +1175,7 @@ className="text-blue-600 hover:underline font-medium bg-transparent p-0 hover:bg
           Property Disclosure Statement
         </button>
       </label>
+      
       {errors.agreeToDisclosure && (
         <p className="mt-1 text-sm text-red-600">{errors.agreeToDisclosure}</p>
       )}
@@ -1220,7 +1225,7 @@ className="text-blue-600 hover:underline font-medium bg-transparent p-0 hover:bg
                 ) : (
                   <button
                     onClick={handleSubmit}
-                    disabled={isSubmitting}
+                    disabled={isSubmitting }
                     className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center text-sm sm:text-base"
                   >
                     {isSubmitting ? (
@@ -1247,9 +1252,23 @@ className="text-blue-600 hover:underline font-medium bg-transparent p-0 hover:bg
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Unit Summary</h3>
 
               <div className="aspect-w-16 aspect-h-9 mb-4">
-                <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
+                {unit.images && unit.images.length > 0 ? (
+                  <img
+                    src={`${apiBaseUrl}/images/${unit.images[0]}`}
+                    alt={`Unit ${unit.unitNumber}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : (
+                      <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
                   <Building className="w-8 h-8 text-gray-400" />
                 </div>
+                  
+                )}
+
               </div>
 
               <div className="space-y-3">

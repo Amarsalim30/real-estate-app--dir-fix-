@@ -375,7 +375,7 @@ const recentActivity = useMemo(() => {
             <StatCard
               title="Total Properties"
               value={units.length}
-              subtitle={`${units.filter(u => u.status === 'available').length} available`}
+              subtitle={`${units.filter(u => u.status === 'AVAILABLE').length} available`}
               icon={Building}
               color="text-blue-600"
               onClick={() => router.push('/units')}
@@ -821,7 +821,7 @@ const recentActivity = useMemo(() => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900 capitalize">
-                            {payment.paymentMethod.replace('_', ' ')}
+                            {payment.paymentMethod?.replace('_', ' ')}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

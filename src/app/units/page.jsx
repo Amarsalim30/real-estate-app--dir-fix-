@@ -7,6 +7,8 @@ import { useUnits } from '@/hooks/useUnits';
 import { useProjects } from '@/hooks/useProjects';
 import { formatPrice } from '@/utils/format';
 import { ConstructionStages, getConstructionStageColor } from '@/lib/constructionStages';
+import BookVisitModal from '@/components/ui/BookingVisit'
+
 import {
   Search,
   Filter,
@@ -175,7 +177,7 @@ const UnitCard = ({ unit, project, viewMode = 'grid' }) => {
             <img
                   src={`${apiBaseUrl}/images/${unit.images[0]}`}
                   alt={`Unit ${unit.unitNumber}`}
-                  className="w-full h-32 object-cover" />
+                  className="w-full h-full object-cover" />
        {unit.images.length < 1 && (
  <Building className="w-16 h-16 text-gray-400" />)}
         <div className="absolute top-4 right-4 flex flex-col gap-2">
@@ -332,6 +334,20 @@ const FeaturedUnitsHero = ({ featuredUnits, projects }) => {
   );
 };
 
+  const handleBooking = async ({ datetime, phone }) => {
+    const res = await fetch('/api/bookings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ datetime, phone }),
+    })
+    if (!res.ok) {
+      const { error } = await res.json()
+      throw new Error(error || 'Failed')
+    }
+  }
+
+
+
 export default function UnitsPage() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -339,6 +355,8 @@ export default function UnitsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState('unitNumber');
   const [sortOrder, setSortOrder] = useState('asc');
+    const [open, setOpen] = useState(false)
+  
   
   const { units, loading: unitsLoading, error: unitsError } = useUnits();
   const { projects, loading: projectsLoading, error: projectsError } = useProjects();
@@ -622,7 +640,7 @@ export default function UnitsPage() {
                   placeholder="Search units, projects, or locations..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="placeholder-gray-500 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
@@ -633,7 +651,7 @@ export default function UnitsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="placeholder-gray-500 text-gray-500  px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="unitNumber">Unit Number</option>
                 <option value="price-asc">Price: Low to High</option>
@@ -1090,10 +1108,21 @@ export default function UnitsPage() {
               Browse through our premium collection of units and find the perfect home that matches your lifestyle and budget.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+              <button 
+                              onClick={() => setOpen(true)}
+
+              className="px-8 py-3 bg-white text-blue-600 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
                 Schedule Site Visit
               </button>
-              <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+                            <BookVisitModal
+                              isOpen={open}
+                              onClose={() => setOpen(false)}
+                              onBooking={handleBooking}
+                            />
+              <button 
+              onClick={() => router.push('/help-center#contact')}
+              className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
+            
                 Contact Sales Team
               </button>
             </div>

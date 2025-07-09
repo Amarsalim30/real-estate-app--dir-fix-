@@ -323,7 +323,7 @@ function PaymentDetailContent() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
           <button
             onClick={handlePrint}
-            className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="text-blue-500 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Printer className="w-4 h-4 mr-2" />
             Print
@@ -331,9 +331,9 @@ function PaymentDetailContent() {
 
           <button
             onClick={handleDownloadReceipt}
-            className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="text-blue-500 flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <Download className="w-4 h-4 mr-2" />
+            <Download className=" w-4 h-4 mr-2" />
             Receipt
           </button>
 
@@ -561,7 +561,7 @@ function PaymentDetailContent() {
                 onClick={handlePrint}
                 className="flex items-center w-full px-4 py-3 text-left bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <Printer className="w-5 h-5 text-gray-600 mr-3 flex-shrink-0" />
+                <Printer className=" w-5 h-5 text-gray-600 mr-3 flex-shrink-0" />
                 <div>
                   <p className="font-medium text-gray-900">Print Details</p>
                   <p className="text-sm text-gray-600">Print this page</p>

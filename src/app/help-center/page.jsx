@@ -356,7 +356,7 @@ export default function HelpCenterPage() {
         </div>
 
         {/* Contact Support */}
-        <div className="bg-white rounded-lg shadow-sm p-8">
+        <div id='contact' className="bg-white rounded-lg shadow-sm p-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Still need help?</h2>
             <p className="text-gray-600">Our support team is available 24/7 to assist you</p>

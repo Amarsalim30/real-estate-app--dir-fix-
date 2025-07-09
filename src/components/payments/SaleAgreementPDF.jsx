@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   
-  tableRow: {
+   tableRow: {
     margin: 'auto',
     flexDirection: 'row',
   },
@@ -539,7 +539,7 @@ const SaleAgreementPDF = ({
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Project Location:</Text>
-           <Text style={styles.infoValue}>{project.location || project.address}</Text>
+            <Text style={styles.infoValue}>{project.location}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Estimated Completion:</Text>
@@ -901,4 +901,5 @@ const SaleAgreementPDF = ({
 };
 
 export default SaleAgreementPDF;
+
 

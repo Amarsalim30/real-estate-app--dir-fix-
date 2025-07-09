@@ -1,6 +1,9 @@
 'use client';
 import React, { useEffect, useId, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+
 import { 
   Calendar, 
   DollarSign,
@@ -22,6 +25,20 @@ const useOutsideClick = (ref, callback) => {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [ref, callback]);
 };
+const handleDownloadPlan = async () => {
+  if (!printRef.current) return;
+
+  const canvas = await html2canvas(printRef.current, { scale: 2 });
+  const imgData = canvas.toDataURL('image/png');
+
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const imgProps = pdf.getImageProperties(imgData);
+  const pdfWidth = pdf.internal.pageSize.getWidth();
+  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+  pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+  pdf.save(`payment-plan-${activePaymentPlan?.title || 'download'}.pdf`);
+};
 
 // Enhanced Step 2 Component with Expandable Payment Plans
 export function PaymentPlanCard({ 
@@ -37,6 +54,9 @@ export function PaymentPlanCard({
   const [activePaymentPlan, setActivePaymentPlan] = useState(null);
   const ref = useRef(null);
   const id = useId();
+  const printRef = useRef();
+
+
 
   
   // Payment plan calculations using API data
@@ -284,7 +304,7 @@ export function PaymentPlanCard({
                 ref={ref}
                 className="w-full max-w-2xl h-full md:h-fit md:max-h-[90%] flex flex-col bg-white rounded-3xl overflow-hidden shadow-2xl m-4"
               >
-                <div className={`${activePaymentPlan.bgColor} ${activePaymentPlan.borderColor} border-b p-6`}>
+                <div  className={`${activePaymentPlan.bgColor} ${activePaymentPlan.borderColor} border-b p-6`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                       <div className={`w-12 h-12 ${activePaymentPlan.bgColor} rounded-full flex items-center justify-center ${activePaymentPlan.iconColor}`}>
@@ -316,6 +336,7 @@ export function PaymentPlanCard({
                     exit={{ opacity: 0 }}
                     className="space-y-6"
                   >
+            <div ref={printRef} className="p-6 space-y-6">
                     {/* Payment Details Table */}
                     <div className="bg-gray-50 rounded-lg p-6">
                       <h4 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h4>
@@ -350,8 +371,7 @@ export function PaymentPlanCard({
                                 ? 'One-time' 
                                 : activePaymentPlan.details.paymentPeriod === 'Flexible'
                                 ? 'Flexible'
-                                : `${activePaymentPlan.
-details.paymentPeriod} months`}
+                                : `${activePaymentPlan.details.paymentPeriod} months`}
                             </span>
                           </div>
                           <div className="flex justify-between py-2 border-b border-gray-200">
@@ -410,8 +430,9 @@ details.paymentPeriod} months`}
                           </p>
                         </div>
                       </div>
+                    
                     )}
-
+                </div>
                     {/* Action Buttons */}
                     <div className="flex space-x-4 pt-4">
                       <motion.button
@@ -422,6 +443,12 @@ details.paymentPeriod} months`}
                         Select This Plan
                       </motion.button>
                       <button
+                          onClick={handleDownloadPlan}
+                          className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-semibold"
+                        >
+                          Download Plan PDF
+                        </button>
+                      <button
                         onClick={() => setActivePaymentPlan(null)}
                         className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                       >
@@ -431,6 +458,7 @@ details.paymentPeriod} months`}
                   </motion.div>
                 </div>
               </motion.div>
+              
             </div>
           ) : null}
         </AnimatePresence>

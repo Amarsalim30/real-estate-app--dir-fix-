@@ -664,7 +664,7 @@ function InvoiceDetailContent() {
                       {formatPrice(payment.amount)}
                     </td>
                     <td className="py-3 text-sm text-gray-900 capitalize">
-                      {payment.paymentMethod.replace('_', ' ')}
+                      {payment.paymentMethod?.replace('_', ' ')}
                     </td>
                     <td className="py-3">
                       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${

@@ -1,6 +1,7 @@
 'use client';
+
 import { useState } from 'react';
-import { PDFService } from '@/components/payments/PDFService';
+import { PDFService } from '@/components/payments/PDFService'; // Fixed import path
 import { FileText, Download, Loader2 } from 'lucide-react';
 
 export default function GenerateAgreementButton({ 
@@ -14,9 +15,10 @@ export default function GenerateAgreementButton({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
 
-const handleGeneratePDF = async (e) => {
-  e.preventDefault();
-  e.stopPropagation();
+  const handleGeneratePDF = async (e) => {
+    e.preventDefault(); // Prevent form submission
+    e.stopPropagation(); // Stop event bubbling
+    
     if (!buyer || !unit || !project || !selectedPlan) {
       setError('Missing required data for agreement generation');
       return;
@@ -49,15 +51,15 @@ const handleGeneratePDF = async (e) => {
           floor: unit.floor
         },
         project: {
-            id: project.id,
-            name: project.name,
-            location: project.address,
-            estimatedCompletion: project.CompletionDate || project.targetCompletionDate
-            },
+          id: project.id,
+          name: project.name,
+          location: project.address,
+          estimatedCompletion: project.estimatedCompletion
+        },
         paymentPlan: {
           id: selectedPlan.id,
           name: selectedPlan.name,
-          durationMonths: selectedPlan.durationMonths,
+          durationMonths: selectedPlan.periodMonths,
           minDownPaymentPercentage: selectedPlan.minDownPaymentPercentage,
           interestRate: selectedPlan.interestRate || 0
         },
@@ -71,26 +73,13 @@ const handleGeneratePDF = async (e) => {
           monthlyPayment: financialSummary.monthlyPayment
         }
       };
-      console.log("buyer",buyer);
-      console.log("unit",unit);
-      console.log("project",project);
-      console.log("selectedPlan",selectedPlan);
-      console.log("financialSummary",financialSummary);
-      
-const { blob, filename } = await PDFService.generateSaleAgreement(agreementData);
+      console.log("Generating PDF with data:", agreementData);
+      console.log("Selected Plan:",  financialSummary.monthlyPayment);
+    
+      const { blob, filename } = await PDFService.generateSaleAgreement(agreementData);
 
-if (!blob) {
-  throw new Error("PDF blob is undefined. Check generation logic.");
-}
-
-const blobUrl = window.URL.createObjectURL(blob);
-const link = document.createElement('a');
-link.href = blobUrl;
-link.setAttribute('download', filename);
-document.body.appendChild(link);
-link.click();
-link.remove();
-window.URL.revokeObjectURL(blobUrl);
+      // Download the PDF
+      PDFService.downloadPDF(blob, filename);
 
       // Optional: Save to server
       // const uploadResponse = await PDFService.savePDFToServer(blob, filename);
@@ -104,30 +93,32 @@ window.URL.revokeObjectURL(blobUrl);
     }
   };
 
-  return (
-      <span className="inline-block">
+return (
+  <span className="inline-block">
     <button
       type="button"
-      className={`inline-flex items-center px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded transition-colors text-xs ${className}`}
       onClick={handleGeneratePDF}
       disabled={isGenerating || !buyer || !unit || !project || !selectedPlan}
+      className="flex items-center text-blue-600 hover:underline font-medium"
     >
-        {isGenerating ? (
-  <>
-    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-    Generating...
-  </>
-) : (
-  <>
-    <FileText className="w-3 h-3 mr-1" />
-    Purchase Agreement
-  </>
-)}
-      </button>
-      
-      {error && (
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+      {isGenerating ? (
+        <>
+          <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+          Generating...
+        </>
+      ) : (
+        <>
+          <FileText className="inline w-3 h-3 mr-1" />
+          <span>Terms and Conditions</span>
+          <span className="mx-1">and</span>
+          <span>Sales Agreement</span>
+        </>
       )}
-    </span>
-  );
+    </button>
+
+    {error && (
+      <p className="mt-1 text-xs text-red-600">{error}</p>
+    )}
+  </span>
+);
 }
