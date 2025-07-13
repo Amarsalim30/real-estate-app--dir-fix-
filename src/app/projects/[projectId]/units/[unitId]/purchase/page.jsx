@@ -715,15 +715,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                     plansError={plansError}
                   />
                   
-                  <div className="mt-6">
-                    <a 
-                      href={`/projects/${project.id}/units/${unit.id}/purchase/payment-plan`} 
-                      className="inline-flex items-center px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors text-sm sm:text-base"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Download Payment Plan
-                    </a>
-                  </div>
+
                 </div>
               )}
 
@@ -753,7 +745,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                         <div className="flex-1">
                           <div className="flex items-center mb-2">
                             <Smartphone className="w-5 h-5 mr-2 text-green-600" />
-                            <div className="font-medium">M-Pesa Push</div>
+                            <div className="text-gray-900 font-medium">M-Pesa Push</div>
                           </div>
                           <div className="text-sm text-gray-500 mb-3">
                             Pay instantly via M-Pesa STK Push
@@ -815,7 +807,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                         <div className="flex-1">
                           <div className="flex items-center mb-2">
                             <Phone className="w-5 h-5 mr-2 text-green-600" />
-                            <div className="font-medium">M-Pesa Paybill</div>
+                            <div className="text-gray-900 font-medium">M-Pesa Paybill</div>
                           </div>
                           <div className="text-sm text-gray-500 mb-3">
                             Pay via M-Pesa Paybill number
@@ -868,7 +860,7 @@ const success = await invoicesApi.hasSuccessWithRetry(purchase.invoiceId, {
                         <div className="flex-1">
                           <div className="flex items-center mb-2">
                             <Building className="w-5 h-5 mr-2 text-blue-600" />
-                            <div className="font-medium">Bank Transfer</div>
+                            <div className="text-gray-900 font-medium">Bank Transfer</div>
                           </div>
                           <div className="text-sm text-gray-500 mb-3">
                             Direct bank to bank transfer

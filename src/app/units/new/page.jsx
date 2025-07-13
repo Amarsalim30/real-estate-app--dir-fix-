@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useProjects } from '@/hooks/useProjects';
+import { useUnits } from '@/hooks/useUnits';
 import { useCreateUnit } from '@/hooks/useUnits';
 import { toast } from 'sonner';
 import {
@@ -48,6 +49,8 @@ export default function NewUnitPage() {
   const router = useRouter();
   const { projects, loading } = useProjects();
   const { createUnit, isLoading: createLoading } = useCreateUnit();
+  const { units } =useUnits(); 
+
 
   const [formData, setFormData] = useState({
     projectId: '',
@@ -101,18 +104,41 @@ export default function NewUnitPage() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+const handleInputChange = (e) => {
+  const { name, value, type, checked } = e.target;
+
+  // Bedroom defaults based on unit type
+  const unitTypeToBedrooms = {
+    STUDIO: 0,
+    ONE_BEDROOM: 1,
+    TWO_BEDROOM: 2,
+    THREE_BEDROOM: 3,
+    FOUR_BEDROOM: 4,
+    PENTHOUSE: 5
+  };
+
+  setFormData(prev => {
+    // When unitType changes, also set bedrooms automatically
+    if (name === 'unitType') {
+      return {
+        ...prev,
+        unitType: value,
+        bedrooms: unitTypeToBedrooms[value] ?? prev.bedrooms
+      };
+    }
+
+    return {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
-    }));
+    };
+  });
 
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
+  // Clear error if any
+  if (errors[name]) {
+    setErrors(prev => ({ ...prev, [name]: '' }));
+  }
+};
+
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -130,14 +156,27 @@ export default function NewUnitPage() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (!validateForm()) {
-      toast.error('Please fix the form errors');
-      return;
-    }
+  if (!validateForm()) {
+    toast.error('Please fix the form errors');
+    return;
+  }
 
-    try {
+  // 🛑 Check for duplicate unit number
+  const isDuplicateUnitNumber = units?.some(
+    unit =>
+      unit.unitNumber.trim().toLowerCase() === formData.unitNumber.trim().toLowerCase() &&
+      unit.projectId === parseInt(formData.projectId)
+  );
+
+  if (isDuplicateUnitNumber) {
+    toast.error('This unit number already exists in the selected project.');
+    return;
+  }
+
+  try {
+  
       setIsUploading(true);
 
       // Upload images first if any are selected
@@ -541,7 +580,6 @@ export default function NewUnitPage() {
                           value={formData.price}
                           onChange={handleInputChange}
                           min="0"
-                          step="1000"
                           className={`text-gray-700 placeholder-gray-400 w-full border rounded-lg pl-10 pr-3 sm:pr-4 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
                             errors.price ? 'border-red-500 bg-red-50' : 'border-gray-300'
                           }`}
@@ -749,7 +787,7 @@ export default function NewUnitPage() {
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">
                         Location
                       </label>
-                      <p className="text-sm text-gray-900 mt-1">{selectedProject.subCounty || `${selectedProject.county}, ${selectedProject.state}`}</p>
+                      <p className="text-sm text-gray-900 mt-1">{selectedProject.address || `${selectedProject.county}, ${selectedProject.state}`}</p>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-500 uppercase tracking-wide">

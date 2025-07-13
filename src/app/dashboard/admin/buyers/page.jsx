@@ -11,6 +11,9 @@ import { useUnits } from '@/hooks/useUnits';
 import { useInvoices } from '@/hooks/useInvoices';
 import { usePayments } from '@/hooks/usePayments';
 
+import exportBuyersAsCSV from '@/components/buyers/ExportBuyersAsCSV';
+import generateBuyerReportPDF from '@/components/buyers/GenerateBuyerReportPDF';
+
 import { formatPrice } from '@/utils/format';
 import { ROLES, hasPermission } from '@/lib/roles';
 import Link from 'next/link';
@@ -55,7 +58,7 @@ const BuyerCard = ({ buyer, stats, onView, onEdit }) => (
           </div>
         </div>
         
-        {buyer.creditScore && (
+        {/* {buyer.creditScore && (
           <div className="text-right">
             <div className="text-sm text-gray-500">Credit Score</div>
             <div className={`text-lg font-bold ${
@@ -65,14 +68,14 @@ const BuyerCard = ({ buyer, stats, onView, onEdit }) => (
               {buyer.creditScore}
             </div>
           </div>
-        )}
+        )} */}
       </div>
 
       {/* Contact Info */}
       <div className="space-y-2 mb-4">
         <div className="flex items-center text-sm text-gray-600">
           <Phone className="w-4 h-4 mr-2" />
-          {buyer.phone}
+          {buyer.phoneNumber}
         </div>
         <div className="flex items-center text-sm text-gray-600">
           <MapPin className="w-4 h-4 mr-2" />
@@ -154,7 +157,7 @@ const BuyerRow = ({ buyer, stats, onView, onEdit }) => (
     </td>
     
     <td className="px-6 py-4 whitespace-nowrap">
-      <div className="text-sm text-gray-900">{buyer.phone}</div>
+      <div className="text-sm text-gray-900">{buyer.phoneNumber}</div>
       <div className="text-sm text-gray-500">{buyer.city}, {buyer.state}</div>
     </td>
     
@@ -172,7 +175,7 @@ const BuyerRow = ({ buyer, stats, onView, onEdit }) => (
       </div>
     </td>
     
-    <td className="px-6 py-4 whitespace-nowrap">
+    {/* <td className="px-6 py-4 whitespace-nowrap">
       {buyer.creditScore && (
         <div className={`text-sm font-medium ${
           buyer.creditScore >= 750 ? 'text-green-600' :
@@ -181,7 +184,7 @@ const BuyerRow = ({ buyer, stats, onView, onEdit }) => (
           {buyer.creditScore}
         </div>
       )}
-    </td>
+    </td> */}
     
     <td className="px-6 py-4 whitespace-nowrap">
       <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
@@ -219,7 +222,7 @@ const BuyerRow = ({ buyer, stats, onView, onEdit }) => (
   </tr>
 );
 
-export function BuyersContent() {
+function BuyersContent() {
   const { data: session } = useSession();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
@@ -312,7 +315,7 @@ const filteredBuyers = useMemo(() => {
     filtered = filtered.filter(buyer =>
       `${buyer.firstName || ''} ${buyer.lastName || ''}`.toLowerCase().includes(searchLower) ||
       (buyer.email || '').toLowerCase().includes(searchLower) ||
-      (buyer.phone || '').includes(searchTerm) ||
+      (buyer.phoneNumber || '').includes(searchTerm) ||
       (buyer.city || '').toLowerCase().includes(searchLower)
     );
   }
@@ -507,7 +510,7 @@ const summaryStats = useMemo(() => {
           </p>
         </div>
 
-        <div className="bg-white rounded-lg shadow-sm border p-6">
+        {/* <div className="bg-white rounded-lg shadow-sm border p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Avg Credit Score</p>
@@ -518,7 +521,7 @@ const summaryStats = useMemo(() => {
           <p className="text-sm text-gray-600 mt-2">
             Across all buyers
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* Filters and Search */}
@@ -533,7 +536,7 @@ const summaryStats = useMemo(() => {
                 placeholder="Search buyers..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="placeholder-gray-500 text-gray-700 w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
 
@@ -559,7 +562,7 @@ const summaryStats = useMemo(() => {
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="placeholder-gray-500 text-gray-700 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="all">All Buyers</option>
                     <option value="active">Active (Has Properties)</option>
@@ -580,7 +583,7 @@ const summaryStats = useMemo(() => {
                       setSortBy(field);
                       setSortOrder(order);
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="placeholder-gray-500 text-gray-700 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="createdAt-desc">Newest First</option>
                     <option value="createdAt-asc">Oldest First</option>
@@ -589,7 +592,7 @@ const summaryStats = useMemo(() => {
                     <option value="properties-desc">Most Properties</option>
                     <option value="totalPaid-desc">Highest Revenue</option>
                     <option value="outstanding-desc">Highest Outstanding</option>
-                    <option value="creditScore-desc">Highest Credit Score</option>
+                    {/* <option value="creditScore-desc">Highest Credit Score</option> */}
                   </select>
                 </div>
 
@@ -601,7 +604,7 @@ const summaryStats = useMemo(() => {
                       setSortBy('createdAt');
                       setSortOrder('desc');
                     }}
-                    className="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="placeholder-gray-500  w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                   >
                     Clear Filters
                   </button>
@@ -705,7 +708,7 @@ const summaryStats = useMemo(() => {
                       <ArrowUpDown className="w-4 h-4 ml-1" />
                     </div>
                   </th>
-                  <th 
+                  {/* <th 
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                     onClick={() => handleSort('creditScore')}
                   >
@@ -713,7 +716,7 @@ const summaryStats = useMemo(() => {
                       Credit Score
                       <ArrowUpDown className="w-4 h-4 ml-1" />
                     </div>
-                  </th>
+                  </th> */}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
@@ -772,14 +775,18 @@ const summaryStats = useMemo(() => {
                 <Mail className="w-4 h-4 mr-1" />
                 Send Email
               </button>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+              <button 
+               onClick={() => generateBuyerReportPDF(buyersWithStats)}
+              className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
                 <FileText className="w-4 h-4 mr-1" />
                 Generate Reports
               </button>
             </div>
             
             <div className="flex items-center space-x-2">
-              <button className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+              <button 
+              onClick={() => exportBuyersAsCSV(buyersWithStats)}
+              className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
                 <Download className="w-4 h-4 mr-1" />
                 Export All
               </button>
@@ -791,7 +798,7 @@ const summaryStats = useMemo(() => {
   );
 }
 
-export  function BuyersPage() {
+export default function BuyersPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 

@@ -46,13 +46,7 @@ const sidebarItems = [
     roles: ['ADMIN', 'USER'],
     description: 'Browse available units'
   },
-  { 
-    icon: Users, 
-    label: 'Buyers', 
-    pathname: '/buyers', 
-    roles: ['ADMIN'],
-    description: 'Manage buyers'
-  },
+
   { 
     icon: Receipt, 
     label: 'Invoices', 
@@ -67,6 +61,13 @@ const sidebarItems = [
     roles: ['ADMIN', 'USER'],
     description: 'Payment history'
   },
+  { 
+  icon: Users, 
+  label: 'My Billing & Statements', 
+  pathname: '/buyers', 
+  roles: ['USER'],
+  description: 'View or manage buyers depending on role'
+},
   // Admin-only management sections
   // { 
   //   icon: BarChart3, 
