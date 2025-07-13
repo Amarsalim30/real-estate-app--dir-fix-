@@ -10,6 +10,9 @@ import { useUnits } from '@/hooks/useUnits';
 import { useProjects } from '@/hooks/useProjects';
 import { formatPrice } from '@/utils/format';
 import { ROLES } from '@/lib/roles';
+
+import generateBuyerStatementPDF from '@/components/buyers/GenerateBuyerStatementPDF';
+
 import { 
   ArrowLeft,
   FileText,
@@ -27,6 +30,7 @@ export default function BuyerStatementPage() {
   const { data: session } = useSession();
   const [dateRange, setDateRange] = useState('all');
   const [statementType, setStatementType] = useState('detailed');
+
 
 const buyerId = useMemo(() => {
   const id = Number(params.buyerId);
@@ -78,7 +82,7 @@ const buyerId = useMemo(() => {
       return {
         id: `invoice-${invoice.id}`,
         type: 'invoice',
-        date: new Date(invoice.issueDate),
+        date: new Date(invoice.issuedDate),
         description: `Invoice ${invoice.invoiceNumber} - ${unit?.unitNumber ? `Unit ${unit.unitNumber}` : 'Unit'} in ${project?.name || 'Project'}`,
         amount: invoice.totalAmount,
         status: invoice.status,
@@ -114,10 +118,9 @@ const buyerId = useMemo(() => {
   const handlePrint = () => {
     window.print();
   };
-
-  const handleExport = () => {
-    alert('Export functionality would be implemented here');
-  };
+const handleExport = () => {
+  generateBuyerStatementPDF(buyer, totals, transactions);
+};
 
 
   if (!buyer) {
@@ -162,19 +165,12 @@ const buyerId = useMemo(() => {
           
           <div className="flex items-center space-x-3">
             <button 
-              onClick={handlePrint} 
-              className="flex items-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </button>
-            <button 
-              onClick={handleExport} 
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export PDF
-            </button>
+  onClick={handleExport}
+  className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+>
+  <Download className="w-4 h-4 mr-2" />
+  Export PDF
+</button>
           </div>
         </div>
 
@@ -243,7 +239,7 @@ const buyerId = useMemo(() => {
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="text-gray-500 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="all">All Time</option>
                 <option value="30">Last 30 Days</option>
@@ -259,7 +255,7 @@ const buyerId = useMemo(() => {
               <select
                 value={statementType}
                 onChange={(e) => setStatementType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="text-gray-500 w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="detailed">Detailed</option>
                 <option value="summary">Summary Only</option>
@@ -366,7 +362,7 @@ const buyerId = useMemo(() => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Opening Balance:</span>
-                  <span className="font-medium">$0.00</span>
+                  <span className="text-gray-500 font-medium">$0.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Total Charges:</span>
@@ -378,7 +374,7 @@ const buyerId = useMemo(() => {
                 </div>
                 <div className="border-t pt-2 mt-2">
                   <div className="flex justify-between font-semibold">
-                    <span>Current Balance:</span>
+                    <span className="text-gray-600">Current Balance:</span>
                     <span className={totals.outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}>
                       {formatPrice(totals.outstandingBalance)}
                     </span>

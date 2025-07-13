@@ -4,6 +4,8 @@ import { useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
 
+import generateInvoicePDF from '@/components/buyers/GenerateInvoicePDF';
+
 
 import { InvoiceStatuses } from '@/data/invoices';
 // import { Payments } from '@/data/payments';
@@ -11,7 +13,7 @@ import { InvoiceStatuses } from '@/data/invoices';
 // import { Projects } from '@/data/projects';
 
 import {useBuyer} from '@/hooks/useBuyers';
-import {useInvoices} from '@/hooks/useInvoices';
+import {useInvoices} from '@/hooks/useInvoices';  
 import {usePayments} from '@/hooks/usePayments';
 import {useUnits} from '@/hooks/useUnits';
 import {useProjects} from '@/hooks/useProjects';
@@ -87,7 +89,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const InvoiceRow = ({ invoice, onView ,Units , Projects, Payments }) => {
+const InvoiceRow = ({ invoice, onView ,Units , Projects, Payments ,buyer }) => {
 if (!Units || !Projects || !Payments) {
     return (
       <tr className="hover:bg-gray-50 border-b border-gray-200">
@@ -99,8 +101,9 @@ if (!Units || !Projects || !Payments) {
   }
 
   const unit = Units.find(u => u.id === invoice.unitId);
-  const project = Projects.find(p => p.id === invoice.projectId);
+  const project = Projects.find(p => p.id === unit.projectId);
   const payments = Payments.filter(p => p.invoiceId === invoice.id);
+
   
   // Add validation for missing related data
   if (!unit || !project) {
@@ -196,12 +199,22 @@ if (!Units || !Projects || !Payments) {
           >
             <Eye className="w-4 h-4" />
           </button>
-          <button
-            className="text-gray-400 hover:text-gray-600 p-1 rounded"
-            title="Download PDF"
-          >
-            <Download className="w-4 h-4" />
-          </button>
+<button
+  onClick={() => {
+    if (!buyer) {
+      alert('Buyer information not available for PDF generation');
+      return;
+    }
+    generateInvoicePDF(invoice, buyer, unit);
+  }}
+  className="text-gray-400 hover:text-gray-600 p-1 rounded"
+  title="Download PDF"
+>
+  <Download className="w-4 h-4" />
+</button>
+
+
+
         </div>
       </td>
     </tr>
@@ -731,6 +744,7 @@ const summaryStats = useMemo(() => {
                     Units={Units}
                     Projects={Projects}
                     Payments={Payments}
+                    buyer={buyer} 
                   />
                 ))
               ) : (

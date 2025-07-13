@@ -132,7 +132,7 @@ const PropertyCard = ({ unit, project, invoice, payments }) => {
   );
 };
 
-function BuyerProfileContent() {
+export function BuyerProfileContent() {
   const { data: session } = useSession();
   const params = useParams();
   const router = useRouter();

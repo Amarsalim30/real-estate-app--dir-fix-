@@ -121,3 +121,9 @@ body {
   background-color: #059669;
 }
 
+@media print {
+  .print-hidden {
+    display: none !important;
+  }
+}
+

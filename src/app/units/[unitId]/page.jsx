@@ -35,6 +35,7 @@ export default function UnitDetailPage() {
   const { units, loading: unitsLoading } = useUnits();
   const { projects, loading: projectsLoading } = useProjects();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const unit = useMemo(() => {
     if (!units || !Array.isArray(units) || !params?.unitId) {
@@ -77,6 +78,21 @@ export default function UnitDetailPage() {
     );
   }
 
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'AVAILABLE':
+        return CheckCircle;
+      case 'RESERVED':
+        return Clock;
+      case 'SOLD':
+        return AlertCircle;
+      case 'UNDER_CONSTRUCTION':
+        return Wrench;
+      default:
+        return Building;
+    }
+  };
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'AVAILABLE':
@@ -91,6 +107,8 @@ export default function UnitDetailPage() {
         return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const StatusIcon = getStatusIcon(unit.status);
 
   const getUnitTypeDisplay = (unitType) => {
     switch (unitType) {
@@ -124,82 +142,92 @@ export default function UnitDetailPage() {
         </button>
 
         {/* Unit Header */}
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden mb-8">
-          <div className="relative h-96">
-
-    
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center">
-              <img
-                  src={`${apiBaseUrl}/images/${unit.images[0]}`}
-                  alt={`Unit ${unit.unitNumber}`}
-                  className="w-full h-32 object-cover" />
-              {unit.images.length = 0 && (<Building className="w-24 h-24 text-blue-400" />)};
-            </div> 
-            {/* Overlay */}
-            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end">
-              <div className="p-8 text-white">
-                              <div className="flex items-center mb-4">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-white/20 backdrop-blur-sm text-white`}>
-                    {unit.status?.replace('_', ' ')}
-                  </span>
-                  {unit.isFeatured && (
-                    <span className="ml-3 px-3 py-1 bg-yellow-500 text-white rounded-full text-sm font-medium flex items-center">
-                      <Award className="w-4 h-4 mr-1" />
-                      Featured
-                    </span>
-                  )}
-                  {/* {unit.currentConstructionStage && (
-                    <span className="ml-3 px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium">
-                      <Wrench className="w-4 h-4 mr-2 inline" />
-                      {ConstructionStages[unit.currentConstructionStage]?.label}
-                    </span>
-                  )} */}
-                </div>
-                
-                {/* <div className="text-xl text-blue-100 mb-2">{getUnitTypeDisplay(unit.unitType)}</div> */}
-                
-                {/* {project && (
-                  <div className="flex items-center text-lg mb-4">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    {project.name}, {project.subCounty}, {project.county}
-                  </div>
-                )} */}
-                
-                
-                {/* <div className="mt-4 text-3xl font-bold">
-                  {formatPrice(unit.price)}
-                  <span className="text-lg font-normal text-blue-200 ml-2">
-                    ({formatPrice(Math.round(unit.price / unit.sqft))}/sq ft)
-                  </span>
-                </div> */}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="absolute top-6 right-6 flex space-x-3">
-                <button className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-colors">
-                  <Heart className="w-5 h-5" />
-                </button>
-                <button className="p-3 bg-white/20 backdrop-blur-sm rounded-full text-white hover:bg-white/30 transition-colors">
-                  <Share2 className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-gray-900 text-4xl font-bold mb-2">Unit {unit.unitNumber}</h1>
+          <p className="text-gray-600 text-lg opacity-90 max-w-2xl">{unit.description}</p>
         </div>
 
-        {/* Unit Details */}
+        {/* Main Layout Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-8">
+            {/* Image Gallery */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div className="relative h-96">
+                {unit.images && unit.images.length > 0 ? (
+                  <img
+                    src={`${apiBaseUrl}/images/${unit.images[activeImageIndex]}`}
+                    alt={`Unit ${unit.unitNumber}`}
+                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <Building className="w-24 h-24 text-gray-400" />
+                  </div>
+                )}
+
+                {/* Status and Featured Badges */}
+                <div className="absolute top-4 left-4 flex flex-col gap-2">
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>
+                    <StatusIcon className="w-4 h-4 mr-2" />
+                    {unit.status?.replace('_', ' ')}
+                  </span>
+                  {unit.isFeatured && (
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-500 text-white">
+                      <Award className="w-4 h-4 mr-2" />
+                      Featured
+                    </span>
+                  )}
+                  {unit.currentStage && (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getConstructionStageColor(unit.currentStage)}`}>
+                      <Wrench className="w-3 h-3 mr-1" />
+                      {unit.currentStage?.replace('_', ' ')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="absolute top-4 right-4 flex space-x-2">
+                  <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-700 hover:bg-white transition-colors">
+                    <Heart className="w-5 h-5" />
+                  </button>
+                  <button className="p-2 bg-white/80 backdrop-blur-sm rounded-full text-gray-700 hover:bg-white transition-colors">
+                    <Share2 className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Thumbnail Gallery */}
+              {unit.images && unit.images.length > 1 && (
+                <div className="p-4 border-t">
+                  <div className="flex space-x-2 overflow-x-auto">
+                    {unit.images.map((image, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setActiveImageIndex(index)}
+                        className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                          activeImageIndex === index ? 'border-blue-500' : 'border-gray-200'
+                        }`}
+                      >
+                        <img
+                          src={`${apiBaseUrl}/images/${image}`}
+                          alt={`Unit ${unit.unitNumber} - ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Unit Specifications */}
             <div className="bg-white rounded-lg shadow-sm border p-6">
-              <div className="border-b border-gray-200 ">
-
-                              <h1 className="text-gray-900 text-4xl font-bold mb-2">Unit {unit.unitNumber}</h1>
-                                              <p className="text-gray-600 text-lg opacity-90 max-w-2xl">{unit.description}</p>
-
-                              </div>
-              <h2 className="mt-6 text-2xl font-bold text-gray-900 mb-6">Unit Specifications</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Unit Specifications</h2>
               
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 <div className="text-center p-4 bg-gray-50 rounded-lg">
@@ -274,7 +302,7 @@ export default function UnitDetailPage() {
                   </div>
                   <div className="flex justify-between py-3 border-b border-gray-200">
                     <span className="text-gray-600">Location</span>
-                    <span className="font-medium text-gray-900">{project.subCounty}, {project.county}</span>
+                    <span className="font-medium text-gray-900">{project.city}, {project.county}</span>
                   </div>
                   <div className="flex justify-between py-3 border-b border-gray-200">
                     <span className="text-gray-600">Address</span>
@@ -329,18 +357,18 @@ export default function UnitDetailPage() {
               </p>
               
               <div className="space-y-4">
-                <button className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium" onClick={() =>     router.push(`/projects/${project.id}/units/${unit.id}/purchase`)}>
+                <button 
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium" 
+                  onClick={() => router.push(`/projects/${project?.id}/units/${unit.id}/purchase`)}
+                >
                   Purchase Now
                 </button>
-                <button onClick={() => router.push(`/projects/${project.id}/units/${unit.id}/reserve`)}
-                  className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-semibold hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all shadow-sm">
+                <button 
+                  onClick={() => router.push(`/projects/${project?.id}/units/${unit.id}/reserve`)}
+                  className="w-full px-6 py-3 border-2 border-blue-600 text-blue-600 rounded-xl font-semibold hover:bg-blue-100 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300 transition-all shadow-sm"
+                >
                   Reserve 
                 </button>
-                {/* {unit.status === 'AVAILABLE' && (
-                  <button className="w-full px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium">
-                    Make a
-                  </button>
-                )} */}
               </div>
 
               <div className="mt-6 pt-6 border-t border-gray-200">
@@ -413,7 +441,7 @@ export default function UnitDetailPage() {
                     </span>
                   </div>
                 )}
-                                <div className="flex justify-between">
+                <div className="flex justify-between">
                   <span className="text-gray-600">Views</span>
                   <span className="font-medium text-gray-900">
                     {Math.floor(Math.random() * 100) + 50} {/* Placeholder for view count */}
@@ -480,15 +508,9 @@ export default function UnitDetailPage() {
             <button className="px-8 py-3 border-2 border-white text-white rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors">
               Get Financing Info
             </button>
-            {/* {unit.status === 'AVAILABLE' && (
-              <button className="px-8 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition-colors">
-                Reserve Now
-              </button>
-            )} */}
           </div>
         </div>
       </div>
     </div>
   );
 }
-

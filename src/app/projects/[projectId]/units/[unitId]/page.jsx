@@ -210,8 +210,7 @@ export default function UnitDetailPage() {
                 ) : 
                 <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
                   <Building className="w-24 h-24 text-gray-400" />
-                </div>
-}
+                </div>}
                 {/* Status and Featured Badges */}
                 <div className="absolute top-4 left-4 flex flex-col gap-2">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(unit.status)}`}>

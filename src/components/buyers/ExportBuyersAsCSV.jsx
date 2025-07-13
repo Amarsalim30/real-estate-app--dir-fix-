@@ -6,8 +6,8 @@ const exportBuyersAsExcel = (buyersWithStats) => {
 
   const data = buyersWithStats.map(buyer => [
     `${buyer.firstName} ${buyer.lastName}`,
+        buyer.nationalId || 'N/A',
     buyer.email,
-    buyer.nationalId || 'N/A',
     buyer.phoneNumber,
     buyer.city,
     buyer.stats?.properties || 0,

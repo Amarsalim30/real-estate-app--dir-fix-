@@ -3,6 +3,8 @@ import { useState, useMemo ,useEffect} from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import DashboardLayout from '@/components/layout/dashboard-layout';
+import exportBuyersAsExcel from '@/components/buyers/ExportBuyersAsCSV';
+import generateBuyerReportPDF from '@/components/buyers/GenerateBuyerReportPDF';
 
 //hooks
 import { useBuyers } from '@/hooks/useBuyers';
@@ -72,7 +74,7 @@ const BuyerCard = ({ buyer, stats, onView, onEdit }) => (
       <div className="space-y-2 mb-4">
         <div className="flex items-center text-sm text-gray-600">
           <Phone className="w-4 h-4 mr-2" />
-          {buyer.phone}
+          {buyer.phoneNumber}
         </div>
         <div className="flex items-center text-sm text-gray-600">
           <MapPin className="w-4 h-4 mr-2" />
@@ -768,18 +770,23 @@ const summaryStats = useMemo(() => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600">Bulk Actions:</span>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+              <button 
+              className="flex items-center px-3 py-1.5 text-sm text-gray-400 border border-gray-200 rounded hover:bg-gray-50 transition-colors">
                 <Mail className="w-4 h-4 mr-1" />
                 Send Email
               </button>
-              <button className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+              <button 
+              onClick={() => generateBuyerReportPDF(buyersWithStats)}
+              className="flex items-center px-3 py-1.5 text-sm text-gray-700 border border-gray-300 rounded hover:bg-gray-50 transition-colors">
                 <FileText className="w-4 h-4 mr-1" />
                 Generate Reports
               </button>
             </div>
             
             <div className="flex items-center space-x-2">
-              <button className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+              <button 
+              onClick={() => exportBuyersAsExcel(buyersWithStats)}
+               className="flex items-center px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
                 <Download className="w-4 h-4 mr-1" />
                 Export All
               </button>
@@ -791,7 +798,7 @@ const summaryStats = useMemo(() => {
   );
 }
 
-export  function BuyersPage() {
+export default function BuyersPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
